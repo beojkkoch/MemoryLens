@@ -132,9 +132,7 @@ void main() {
     expect(find.text('Viajes'), findsOneWidget);
   });
 
-  testWidgets('empty form shows an error and does not sign up', (
-    tester,
-  ) async {
+  testWidgets('empty form shows an error and does not sign up', (tester) async {
     await pumpApp(tester, route: '/register');
     await tester.tap(find.text('Comenzar'));
     await tester.pumpAndSettle();

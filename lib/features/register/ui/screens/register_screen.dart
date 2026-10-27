@@ -243,9 +243,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
           TextButton(
-            onPressed: () => context.read<RegisterBloc>().add(
-              RegisterInterestsRequested(),
-            ),
+            onPressed: () =>
+                context.read<RegisterBloc>().add(RegisterInterestsRequested()),
             child: const Text('Reintentar'),
           ),
         ],
