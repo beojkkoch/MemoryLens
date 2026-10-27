@@ -195,8 +195,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const _FieldLabel('Intereses'),
                     const SizedBox(height: 8),
                     _buildInterests(state),
-                    const SizedBox(height: 24),
-                    if (error != null) ErrorMessage(message: error),
                   ],
                 ),
               ),
@@ -209,10 +207,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               child: SafeArea(
                 top: false,
-                child: PrimaryButton(
-                  label: 'Comenzar',
-                  isLoading: state.status == RegisterStatus.loading,
-                  onPressed: () => _submit(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (error != null) ...[
+                      ErrorMessage(message: error),
+                      const SizedBox(height: 12),
+                    ],
+                    PrimaryButton(
+                      label: 'Comenzar',
+                      isLoading: state.status == RegisterStatus.loading,
+                      onPressed: () => _submit(),
+                    ),
+                  ],
                 ),
               ),
             ),
