@@ -15,6 +15,7 @@ class MemoryLensAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     return AppBar(
       toolbarHeight: 64,
+      centerTitle: false,
       titleSpacing: 0,
       shape: const Border(bottom: BorderSide(color: AppColors.border)),
       title: Column(
