@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:memorylens/theme/app_theme.dart';
 
 /// Top bar with the back arrow, the "MEMORY LENS" label and the screen title.
+/// [onBack] replaces the default pop, e.g. to go back one step of a form.
 class MemoryLensAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+  final Function()? onBack;
 
-  const MemoryLensAppBar({super.key, required this.title});
+  const MemoryLensAppBar({super.key, required this.title, this.onBack});
 
   @override
   Size get preferredSize => const Size.fromHeight(64);
@@ -16,6 +18,13 @@ class MemoryLensAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       toolbarHeight: 64,
       centerTitle: false,
+      leading: onBack == null
+          ? null
+          : IconButton(
+              icon: const BackButtonIcon(),
+              tooltip: 'Volver',
+              onPressed: () => onBack!(),
+            ),
       titleSpacing: 0,
       shape: const Border(bottom: BorderSide(color: AppColors.border)),
       title: Column(
