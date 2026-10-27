@@ -26,7 +26,7 @@ class InterestChip extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primary : AppColors.secondary,
+            color: selected ? AppColors.primary : AppColors.background,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: AppColors.primary.withValues(alpha: 0.28),
