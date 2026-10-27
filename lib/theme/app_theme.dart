@@ -16,8 +16,9 @@ class AppColors {
 }
 
 ThemeData buildTheme() {
-  final base = ThemeData(useMaterial3: true);
-  return base.copyWith(
+  return ThemeData(
+    useMaterial3: true,
+    fontFamily: GoogleFonts.manrope().fontFamily,
     colorScheme: ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       primary: AppColors.primary,
@@ -29,10 +30,6 @@ ThemeData buildTheme() {
       error: AppColors.error,
     ),
     scaffoldBackgroundColor: AppColors.background,
-    textTheme: GoogleFonts.manropeTextTheme(base.textTheme).apply(
-      bodyColor: AppColors.textPrimary,
-      displayColor: AppColors.textPrimary,
-    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.background,
       foregroundColor: AppColors.textPrimary,
