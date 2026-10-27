@@ -7,7 +7,10 @@ class SupabaseInterestDataSource {
 
   Future<List<Interest>> getInterests() async {
     try {
-      final rows = await _client.from('interes').select().order('id');
+      final rows = await _client
+          .from('interes')
+          .select()
+          .order('id', ascending: true);
       return rows
           .map(
             (row) =>
