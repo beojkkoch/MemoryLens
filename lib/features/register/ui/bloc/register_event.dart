@@ -19,6 +19,7 @@ class RegisterSubmitted extends RegisterEvent {
   final String city;
   final String profession;
   final List<Interest> interests;
+  final List<String> newInterestNames;
 
   RegisterSubmitted({
     required this.fullName,
@@ -27,10 +28,12 @@ class RegisterSubmitted extends RegisterEvent {
     required this.city,
     required this.profession,
     required this.interests,
+    this.newInterestNames = const [],
   });
 
   @override
   String toString() {
-    return 'RegisterSubmitted(email: $email, interests: ${interests.length})';
+    return 'RegisterSubmitted(email: $email, interests: ${interests.length}, '
+        'new: ${newInterestNames.length})';
   }
 }

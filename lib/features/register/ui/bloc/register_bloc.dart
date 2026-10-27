@@ -46,6 +46,7 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
         city: event.city,
         profession: event.profession,
         interests: event.interests,
+        newInterestNames: event.newInterestNames,
       );
       emit(state.copyWith(status: RegisterStatus.success, profile: profile));
     } on Exception catch (e) {
