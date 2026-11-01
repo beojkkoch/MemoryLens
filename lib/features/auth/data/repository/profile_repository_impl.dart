@@ -16,4 +16,9 @@ class ProfileRepositoryImpl implements ProfileRepository {
   Future<void> saveInterests(String userId, List<int> interestIds) {
     return _dataSource.saveInterests(userId, interestIds);
   }
+
+  @override
+  Future<Profile> getProfile(String userId) {
+    return _dataSource.getProfile(userId);
+  }
 }

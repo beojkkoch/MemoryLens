@@ -8,8 +8,14 @@ import 'package:memorylens/features/auth/domain/repository/auth_repository.dart'
 import 'package:memorylens/features/auth/domain/repository/interest_repository.dart';
 import 'package:memorylens/features/auth/domain/repository/profile_repository.dart';
 import 'package:memorylens/features/auth/domain/usecases/get_interests_usecase.dart';
+import 'package:memorylens/features/auth/domain/usecases/get_profile_usecase.dart';
+import 'package:memorylens/features/auth/domain/usecases/sign_in_usecase.dart';
+import 'package:memorylens/features/auth/domain/usecases/sign_out_usecase.dart';
 import 'package:memorylens/features/auth/domain/usecases/sign_up_usecase.dart';
+import 'package:memorylens/features/login/ui/bloc/login_bloc.dart';
 import 'package:memorylens/features/login/ui/screens/login_screen.dart';
+import 'package:memorylens/features/profile/ui/bloc/profile_bloc.dart';
+import 'package:memorylens/features/profile/ui/bloc/profile_event.dart';
 import 'package:memorylens/features/profile/ui/screens/profile_screen.dart';
 import 'package:memorylens/features/register/ui/bloc/register_bloc.dart';
 import 'package:memorylens/features/register/ui/screens/register_screen.dart';
@@ -35,12 +41,31 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  AppUser? currentUser() => null;
+  Future<AppUser> signIn({
+    required String email,
+    required String password,
+  }) async {
+    if (error != null) throw error!;
+    this.email = email;
+    this.password = password;
+    return AppUser(id: 'user-1', email: email);
+  }
+
+  @override
+  Future<void> signOut() {
+    return Future.value();
+  }
+
+  @override
+  AppUser? currentUser() {
+    final email = this.email;
+    return email == null ? null : AppUser(id: 'user-1', email: email);
+  }
 }
 
 /// Keeps the saved profile and interests in memory.
 class FakeProfileRepository implements ProfileRepository {
-  Profile? profile;
+  late Profile profile;
   List<int>? interestIds;
 
   @override
@@ -51,6 +76,11 @@ class FakeProfileRepository implements ProfileRepository {
   @override
   Future<void> saveInterests(String userId, List<int> interestIds) async {
     this.interestIds = interestIds;
+  }
+
+  @override
+  Future<Profile> getProfile(String userId) async {
+    return profile;
   }
 }
 
@@ -90,9 +120,14 @@ void main() {
     sl.registerSingleton<AuthRepository>(auth);
     sl.registerSingleton<ProfileRepository>(profiles);
     sl.registerSingleton<InterestRepository>(interests);
-    sl.registerLazySingleton(() => SignUpUseCase());
+    sl.registerLazySingleton<SignUpUseCase>(() => SignUpUseCase());
     sl.registerLazySingleton(() => GetInterestsUseCase());
     sl.registerFactory(() => RegisterBloc());
+    sl.registerLazySingleton(() => GetProfileUseCase());
+    sl.registerLazySingleton(() => SignOutUsecase());
+    sl.registerLazySingleton(() => SignInUsecase());
+    sl.registerFactory(() => LoginBloc());
+    sl.registerFactory(() => ProfileBloc());
   });
 
   Future<void> pumpApp(WidgetTester tester, {String route = '/'}) async {
@@ -104,12 +139,18 @@ void main() {
         initialRoute: route,
         routes: {
           '/': (_) => const WelcomeScreen(),
-          '/login': (_) => const LoginScreen(),
+          '/login': (_) => BlocProvider(
+            create: (_) => sl<LoginBloc>(),
+            child: const LoginScreen(),
+          ),
           '/register': (_) => BlocProvider(
             create: (_) => sl<RegisterBloc>(),
             child: const RegisterScreen(),
           ),
-          '/profile': (_) => const ProfileScreen(),
+          '/profile': (_) => BlocProvider(
+            create: (_) => sl<ProfileBloc>()..add(ProfileRequested()),
+            child: const ProfileScreen(),
+          ),
         },
       ),
     );
@@ -148,6 +189,47 @@ void main() {
     await tester.tap(find.text('Continuar con correo electrónico'));
     await tester.pumpAndSettle();
     expect(find.text('Iniciar sesión'), findsOneWidget);
+  });
+
+  testWidgets('login with valid credentials opens the profile', (tester) async {
+    profiles.profile = const Profile(
+      id: 'user-1',
+      fullName: 'Ana Gómez',
+      email: 'ana@memorylens.ai',
+      city: 'Bogotá',
+      profession: 'Diseñadora',
+    );
+    await pumpApp(tester, route: '/login');
+    await tester.enterText(find.byType(TextField).at(0), 'ana@memorylens.ai');
+    await tester.enterText(find.byType(TextField).at(1), 'secreto123');
+    await tester.tap(find.text('Entrar'));
+    await tester.pumpAndSettle();
+
+    expect(auth.email, 'ana@memorylens.ai');
+    expect(auth.password, 'secreto123');
+    expect(find.text('Mi perfil'), findsOneWidget);
+    expect(find.text('Ana Gómez'), findsOneWidget);
+  });
+
+  testWidgets('login with empty fields shows a message', (tester) async {
+    await pumpApp(tester, route: '/login');
+    await tester.tap(find.text('Entrar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Completa todos los campos'), findsOneWidget);
+    expect(auth.email, isNull);
+  });
+
+  testWidgets('login failure shows the message from the backend', (
+    tester,
+  ) async {
+    auth.error = Exception('Correo o contraseña incorrectos');
+    await pumpApp(tester, route: '/login');
+    await tester.enterText(find.byType(TextField).at(0), 'ana@memorylens.ai');
+    await tester.enterText(find.byType(TextField).at(1), 'mala-clave');
+    await tester.tap(find.text('Entrar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Correo o contraseña incorrectos'), findsOneWidget);
+    expect(find.text('Mi perfil'), findsNothing);
   });
 
   testWidgets('welcome opens the register screen on step one', (tester) async {
@@ -249,12 +331,14 @@ void main() {
 
     expect(auth.email, 'ana@memorylens.ai');
     expect(auth.password, 'secreto123');
-    expect(profiles.profile?.fullName, 'Ana Gómez');
-    expect(profiles.profile?.city, 'Bogotá');
-    expect(profiles.profile?.profession, 'Diseñadora');
+    expect(profiles.profile.fullName, 'Ana Gómez');
+    expect(profiles.profile.city, 'Bogotá');
+    expect(profiles.profile.profession, 'Diseñadora');
     expect(interests.createdNames, ['Fotografía']);
     expect(profiles.interestIds, unorderedEquals([1, 100]));
     expect(find.text('Mi perfil'), findsOneWidget);
+    expect(find.text('Ana Gómez'), findsOneWidget);
+    expect(find.text('ana@memorylens.ai'), findsOneWidget);
   });
 
   testWidgets('sign up failure shows the message from the backend', (

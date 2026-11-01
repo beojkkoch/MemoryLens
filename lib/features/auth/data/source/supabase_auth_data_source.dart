@@ -25,6 +25,28 @@ class SupabaseAuthDataSource {
     }
   }
 
+  Future<AppUser> signIn({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final response = await _client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      if (response.user == null) {
+        throw Exception('El servidor no reconoció las credenciales');
+      }
+      return _toAppUser(response.user);
+    } on AuthException catch (e) {
+      throw Exception(_translate(e));
+    }
+  }
+
+  Future<void> signOut() async {
+    await _client.auth.signOut();
+  }
+
   AppUser? currentUser() {
     final user = _client.auth.currentUser;
     if (user == null) return null;
@@ -45,6 +67,16 @@ class SupabaseAuthDataSource {
     }
     if (e.code == 'email_address_invalid') {
       return 'El correo no es válido';
+    }
+    if (e.code == 'invalid_credentials' ||
+        e.code == 'invalid_login_credentials') {
+      return 'Correo o contraseña incorrectos';
+    }
+    if (e.code == 'email_not_confirmed') {
+      return 'Confirma tu correo antes de iniciar sesión';
+    }
+    if (e.code == 'invalid_password') {
+      return 'Contraseña incorrecta';
     }
     return e.message;
   }

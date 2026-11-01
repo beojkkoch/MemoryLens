@@ -4,4 +4,6 @@ import 'package:memorylens/features/auth/domain/entities/profile.dart';
 abstract class ProfileRepository {
   Future<void> createProfile(Profile profile);
   Future<void> saveInterests(String userId, List<int> interestIds);
+
+  Future<Profile> getProfile(String userId);
 }
