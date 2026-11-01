@@ -170,6 +170,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
     setState(() => _formError = null);
+    FocusScope.of(context).unfocus();
     final bloc = context.read<RegisterBloc>();
     bloc.add(
       RegisterSubmitted(
