@@ -1,0 +1,5 @@
+# Fixed port for `flutter run -d chrome`: Supabase only redirects the
+# confirmation email to URLs on its allow list.
+server:
+  host: localhost
+  port: 3000

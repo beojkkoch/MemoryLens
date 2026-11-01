@@ -11,9 +11,4 @@ class InterestRepositoryImpl implements InterestRepository {
   Future<List<Interest>> getInterests() {
     return _dataSource.getInterests();
   }
-
-  @override
-  Future<List<Interest>> createInterests(List<String> names) {
-    return _dataSource.createInterests(names);
-  }
 }

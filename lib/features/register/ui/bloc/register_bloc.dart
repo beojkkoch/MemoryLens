@@ -39,7 +39,7 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
   ) async {
     emit(state.copyWith(status: RegisterStatus.loading));
     try {
-      final profile = await _signUp(
+      await _signUp(
         fullName: event.fullName,
         email: event.email,
         password: event.password,
@@ -48,7 +48,7 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
         interests: event.interests,
         newInterestNames: event.newInterestNames,
       );
-      emit(state.copyWith(status: RegisterStatus.success, profile: profile));
+      emit(state.copyWith(status: RegisterStatus.success));
     } on Exception catch (e) {
       emit(
         state.copyWith(

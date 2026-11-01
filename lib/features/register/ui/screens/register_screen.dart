@@ -200,8 +200,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           if (state.status == RegisterStatus.success) {
             Navigator.pushNamedAndRemoveUntil(
               context,
-              '/profile',
-              (_) => false,
+              '/confirm-email',
+              ModalRoute.withName('/'),
+              arguments: _emailController.text.trim(),
             );
           }
         },

@@ -10,8 +10,24 @@ class AuthRepositoryImpl implements AuthRepository {
   //AuthRepositoryImpl(this._dataSource);
 
   @override
-  Future<AppUser> signUp({required String email, required String password}) {
-    return _dataSource.signUp(email: email, password: password);
+  Future<AppUser> signUp({
+    required String email,
+    required String password,
+    required String fullName,
+    required String city,
+    required String profession,
+    required List<int> interestIds,
+    required List<String> newInterestNames,
+  }) {
+    return _dataSource.signUp(
+      email: email,
+      password: password,
+      fullName: fullName,
+      city: city,
+      profession: profession,
+      interestIds: interestIds,
+      newInterestNames: newInterestNames,
+    );
   }
 
   @override

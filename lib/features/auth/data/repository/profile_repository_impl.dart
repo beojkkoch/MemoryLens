@@ -8,16 +8,6 @@ class ProfileRepositoryImpl implements ProfileRepository {
   final SupabaseProfileDataSource _dataSource = sl();
 
   @override
-  Future<void> createProfile(Profile profile) {
-    return _dataSource.createProfile(profile);
-  }
-
-  @override
-  Future<void> saveInterests(String userId, List<int> interestIds) {
-    return _dataSource.saveInterests(userId, interestIds);
-  }
-
-  @override
   Future<Profile> getProfile(String userId) {
     return _dataSource.getProfile(userId);
   }
