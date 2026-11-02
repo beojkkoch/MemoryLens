@@ -16,7 +16,7 @@ La `Project URL` y la `publishable key` de Supabase están en `lib/main.dart`.
 
 ## Cómo navegar la app
 
-La app tiene **un solo tipo de usuario**: la persona dueña de la galería. No hay roles ni administradores; cada usuario solo ve sus propios datos.
+La app tiene **un solo tipo de usuario**: la persona dueña de la galería. 
 
 ```text
 Bienvenida ──► Registro (paso 1 → paso 2) ──► Confirma tu correo ──► Iniciar sesión ──► Mi perfil
