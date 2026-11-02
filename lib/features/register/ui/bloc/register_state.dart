@@ -1,5 +1,4 @@
 import 'package:memorylens/features/auth/domain/entities/interest.dart';
-import 'package:memorylens/features/auth/domain/entities/profile.dart';
 
 enum RegisterStatus { initial, loading, success, failure }
 
@@ -10,14 +9,12 @@ class RegisterState {
   final RegisterStatus status;
   final InterestsStatus interestsStatus;
   final List<Interest> interests;
-  final Profile? profile;
   final String? errorMessage;
 
   const RegisterState({
     this.status = RegisterStatus.initial,
     this.interestsStatus = InterestsStatus.loading,
     this.interests = const [],
-    this.profile,
     this.errorMessage,
   });
 
@@ -25,14 +22,12 @@ class RegisterState {
     RegisterStatus? status,
     InterestsStatus? interestsStatus,
     List<Interest>? interests,
-    Profile? profile,
     String? errorMessage,
   }) {
     return RegisterState(
       status: status ?? this.status,
       interestsStatus: interestsStatus ?? this.interestsStatus,
       interests: interests ?? this.interests,
-      profile: profile ?? this.profile,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }

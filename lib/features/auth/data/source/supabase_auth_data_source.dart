@@ -1,28 +1,67 @@
+import 'package:flutter/foundation.dart';
 import 'package:memorylens/features/auth/domain/entities/app_user.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// The only file that talks to Supabase Auth.
 class SupabaseAuthDataSource {
+  static const _webRedirectUrl = 'http://localhost:3000/';
+  static const _mobileRedirectUrl = 'memorylens://login-callback/';
+
   final SupabaseClient _client = Supabase.instance.client;
 
   Future<AppUser> signUp({
     required String email,
     required String password,
+    required String fullName,
+    required String city,
+    required String profession,
+    required List<int> interestIds,
+    required List<String> newInterestNames,
   }) async {
     try {
       final response = await _client.auth.signUp(
         email: email,
         password: password,
+        emailRedirectTo: kIsWeb ? _webRedirectUrl : _mobileRedirectUrl,
+        data: {
+          'nombre': fullName,
+          'ciudad': city,
+          'profesion': profession,
+          'intereses': interestIds,
+          'intereses_nuevos': newInterestNames,
+        },
       );
-      if (response.session == null) {
-        throw Exception(
-          'Revisa tu correo para confirmar la cuenta antes de continuar',
-        );
+      // With confirmations on, Supabase hides that the email is taken and
+      // answers with a user that has no identities.
+      if (response.user?.identities?.isEmpty ?? false) {
+        throw Exception('Ya existe una cuenta con ese correo');
       }
       return _toAppUser(response.user);
     } on AuthException catch (e) {
       throw Exception(_translate(e));
     }
+  }
+
+  Future<AppUser> signIn({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final response = await _client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      if (response.user == null) {
+        throw Exception('El servidor no reconoció las credenciales');
+      }
+      return _toAppUser(response.user);
+    } on AuthException catch (e) {
+      throw Exception(_translate(e));
+    }
+  }
+
+  Future<void> signOut() async {
+    await _client.auth.signOut();
   }
 
   AppUser? currentUser() {
@@ -45,6 +84,16 @@ class SupabaseAuthDataSource {
     }
     if (e.code == 'email_address_invalid') {
       return 'El correo no es válido';
+    }
+    if (e.code == 'invalid_credentials' ||
+        e.code == 'invalid_login_credentials') {
+      return 'Correo o contraseña incorrectos';
+    }
+    if (e.code == 'email_not_confirmed') {
+      return 'Confirma tu correo antes de iniciar sesión';
+    }
+    if (e.code == 'invalid_password') {
+      return 'Contraseña incorrecta';
     }
     return e.message;
   }

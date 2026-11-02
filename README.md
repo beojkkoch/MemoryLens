@@ -23,7 +23,9 @@ npx supabase link --project-ref vhavapudcqyvwycqizun
 npx supabase db push
 ```
 
-El registro necesita que **Confirm email** esté apagado (Dashboard › Authentication › Sign In / Providers › Email), igual que `enable_confirmations = false` en `supabase/config.toml`. Si está encendido, Supabase no devuelve sesión al registrarse y la app no puede guardar el perfil.
+El registro necesita que **Confirm email** esté encendido (Dashboard › Authentication › Sign In / Providers › Email), igual que `enable_confirmations = true` en `supabase/config.toml`. Los datos del formulario viajan como metadatos de la cuenta, y el trigger `crear_perfil_al_confirmar` guarda el perfil y los intereses cuando se confirma el correo.
+
+En Dashboard › Authentication › URL Configuration, usa `http://localhost:3000` como **Site URL** y agrega `http://localhost:3000/` y `memorylens://login-callback/` a **Redirect URLs**. La versión web corre siempre en el puerto 3000, fijado en `web_dev_config.yaml`.
 
 ### Modelo de datos
 

@@ -3,9 +3,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:memorylens/injection_container.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:memorylens/features/login/ui/bloc/login_bloc.dart';
 import 'package:memorylens/features/login/ui/screens/login_screen.dart';
+import 'package:memorylens/features/profile/ui/bloc/profile_bloc.dart';
+import 'package:memorylens/features/profile/ui/bloc/profile_event.dart';
 import 'package:memorylens/features/profile/ui/screens/profile_screen.dart';
 import 'package:memorylens/features/register/ui/bloc/register_bloc.dart';
+import 'package:memorylens/features/register/ui/screens/confirm_email_screen.dart';
 import 'package:memorylens/features/register/ui/screens/register_screen.dart';
 import 'package:memorylens/features/welcome/ui/screens/welcome_screen.dart';
 import 'package:memorylens/theme/app_theme.dart';
@@ -42,12 +46,19 @@ class App extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (_) => const WelcomeScreen(),
-        '/login': (_) => const LoginScreen(),
+        '/login': (_) => BlocProvider(
+          create: (_) => sl<LoginBloc>(),
+          child: const LoginScreen(),
+        ),
         '/register': (_) => BlocProvider(
           create: (_) => sl<RegisterBloc>(),
           child: const RegisterScreen(),
         ),
-        '/profile': (_) => const ProfileScreen(),
+        '/confirm-email': (_) => const ConfirmEmailScreen(),
+        '/profile': (_) => BlocProvider(
+          create: (_) => sl<ProfileBloc>()..add(ProfileRequested()),
+          child: const ProfileScreen(),
+        ),
       },
     );
   }

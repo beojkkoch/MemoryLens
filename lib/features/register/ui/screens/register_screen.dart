@@ -170,6 +170,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
     setState(() => _formError = null);
+    FocusScope.of(context).unfocus();
     final bloc = context.read<RegisterBloc>();
     bloc.add(
       RegisterSubmitted(
@@ -200,8 +201,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           if (state.status == RegisterStatus.success) {
             Navigator.pushNamedAndRemoveUntil(
               context,
-              '/profile',
-              (_) => false,
+              '/confirm-email',
+              ModalRoute.withName('/'),
+              arguments: _emailController.text.trim(),
             );
           }
         },

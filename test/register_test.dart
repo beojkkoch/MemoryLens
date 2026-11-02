@@ -8,10 +8,17 @@ import 'package:memorylens/features/auth/domain/repository/auth_repository.dart'
 import 'package:memorylens/features/auth/domain/repository/interest_repository.dart';
 import 'package:memorylens/features/auth/domain/repository/profile_repository.dart';
 import 'package:memorylens/features/auth/domain/usecases/get_interests_usecase.dart';
+import 'package:memorylens/features/auth/domain/usecases/get_profile_usecase.dart';
+import 'package:memorylens/features/auth/domain/usecases/sign_in_usecase.dart';
+import 'package:memorylens/features/auth/domain/usecases/sign_out_usecase.dart';
 import 'package:memorylens/features/auth/domain/usecases/sign_up_usecase.dart';
+import 'package:memorylens/features/login/ui/bloc/login_bloc.dart';
 import 'package:memorylens/features/login/ui/screens/login_screen.dart';
+import 'package:memorylens/features/profile/ui/bloc/profile_bloc.dart';
+import 'package:memorylens/features/profile/ui/bloc/profile_event.dart';
 import 'package:memorylens/features/profile/ui/screens/profile_screen.dart';
 import 'package:memorylens/features/register/ui/bloc/register_bloc.dart';
+import 'package:memorylens/features/register/ui/screens/confirm_email_screen.dart';
 import 'package:memorylens/features/register/ui/screens/register_screen.dart';
 import 'package:memorylens/features/welcome/ui/screens/welcome_screen.dart';
 import 'package:memorylens/injection_container.dart';
@@ -21,10 +28,36 @@ import 'package:memorylens/theme/app_theme.dart';
 class FakeAuthRepository implements AuthRepository {
   String? email;
   String? password;
+  String? fullName;
+  String? city;
+  String? profession;
+  List<int>? interestIds;
+  List<String>? newInterestNames;
   Exception? error;
 
   @override
   Future<AppUser> signUp({
+    required String email,
+    required String password,
+    required String fullName,
+    required String city,
+    required String profession,
+    required List<int> interestIds,
+    required List<String> newInterestNames,
+  }) async {
+    if (error != null) throw error!;
+    this.email = email;
+    this.password = password;
+    this.fullName = fullName;
+    this.city = city;
+    this.profession = profession;
+    this.interestIds = interestIds;
+    this.newInterestNames = newInterestNames;
+    return AppUser(id: 'user-1', email: email);
+  }
+
+  @override
+  Future<AppUser> signIn({
     required String email,
     required String password,
   }) async {
@@ -35,44 +68,35 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  AppUser? currentUser() => null;
+  Future<void> signOut() {
+    return Future.value();
+  }
+
+  @override
+  AppUser? currentUser() {
+    final email = this.email;
+    return email == null ? null : AppUser(id: 'user-1', email: email);
+  }
 }
 
-/// Keeps the saved profile and interests in memory.
+/// Serves the profile the backend would have saved.
 class FakeProfileRepository implements ProfileRepository {
-  Profile? profile;
-  List<int>? interestIds;
+  late Profile profile;
 
   @override
-  Future<void> createProfile(Profile profile) async {
-    this.profile = profile;
-  }
-
-  @override
-  Future<void> saveInterests(String userId, List<int> interestIds) async {
-    this.interestIds = interestIds;
+  Future<Profile> getProfile(String userId) async {
+    return profile;
   }
 }
 
-/// Serves part of the seeded catalog and gives new names ids from 100.
+/// Serves part of the seeded catalog.
 class FakeInterestRepository implements InterestRepository {
-  List<String>? createdNames;
-
   @override
   Future<List<Interest>> getInterests() async {
     return const [
       Interest(id: 1, name: 'Tecnología'),
       Interest(id: 2, name: 'Moda'),
       Interest(id: 6, name: 'Viajes'),
-    ];
-  }
-
-  @override
-  Future<List<Interest>> createInterests(List<String> names) async {
-    createdNames = names;
-    return [
-      for (var i = 0; i < names.length; i++)
-        Interest(id: 100 + i, name: names[i]),
     ];
   }
 }
@@ -90,9 +114,14 @@ void main() {
     sl.registerSingleton<AuthRepository>(auth);
     sl.registerSingleton<ProfileRepository>(profiles);
     sl.registerSingleton<InterestRepository>(interests);
-    sl.registerLazySingleton(() => SignUpUseCase());
+    sl.registerLazySingleton<SignUpUseCase>(() => SignUpUseCase());
     sl.registerLazySingleton(() => GetInterestsUseCase());
     sl.registerFactory(() => RegisterBloc());
+    sl.registerLazySingleton(() => GetProfileUseCase());
+    sl.registerLazySingleton(() => SignOutUsecase());
+    sl.registerLazySingleton(() => SignInUsecase());
+    sl.registerFactory(() => LoginBloc());
+    sl.registerFactory(() => ProfileBloc());
   });
 
   Future<void> pumpApp(WidgetTester tester, {String route = '/'}) async {
@@ -104,12 +133,19 @@ void main() {
         initialRoute: route,
         routes: {
           '/': (_) => const WelcomeScreen(),
-          '/login': (_) => const LoginScreen(),
+          '/login': (_) => BlocProvider(
+            create: (_) => sl<LoginBloc>(),
+            child: const LoginScreen(),
+          ),
           '/register': (_) => BlocProvider(
             create: (_) => sl<RegisterBloc>(),
             child: const RegisterScreen(),
           ),
-          '/profile': (_) => const ProfileScreen(),
+          '/confirm-email': (_) => const ConfirmEmailScreen(),
+          '/profile': (_) => BlocProvider(
+            create: (_) => sl<ProfileBloc>()..add(ProfileRequested()),
+            child: const ProfileScreen(),
+          ),
         },
       ),
     );
@@ -148,6 +184,47 @@ void main() {
     await tester.tap(find.text('Continuar con correo electrónico'));
     await tester.pumpAndSettle();
     expect(find.text('Iniciar sesión'), findsOneWidget);
+  });
+
+  testWidgets('login with valid credentials opens the profile', (tester) async {
+    profiles.profile = const Profile(
+      id: 'user-1',
+      fullName: 'Ana Gómez',
+      email: 'ana@memorylens.ai',
+      city: 'Bogotá',
+      profession: 'Diseñadora',
+    );
+    await pumpApp(tester, route: '/login');
+    await tester.enterText(find.byType(TextField).at(0), 'ana@memorylens.ai');
+    await tester.enterText(find.byType(TextField).at(1), 'secreto123');
+    await tester.tap(find.text('Entrar'));
+    await tester.pumpAndSettle();
+
+    expect(auth.email, 'ana@memorylens.ai');
+    expect(auth.password, 'secreto123');
+    expect(find.text('Mi perfil'), findsOneWidget);
+    expect(find.text('Ana Gómez'), findsOneWidget);
+  });
+
+  testWidgets('login with empty fields shows a message', (tester) async {
+    await pumpApp(tester, route: '/login');
+    await tester.tap(find.text('Entrar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Completa todos los campos'), findsOneWidget);
+    expect(auth.email, isNull);
+  });
+
+  testWidgets('login failure shows the message from the backend', (
+    tester,
+  ) async {
+    auth.error = Exception('Correo o contraseña incorrectos');
+    await pumpApp(tester, route: '/login');
+    await tester.enterText(find.byType(TextField).at(0), 'ana@memorylens.ai');
+    await tester.enterText(find.byType(TextField).at(1), 'mala-clave');
+    await tester.tap(find.text('Entrar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Correo o contraseña incorrectos'), findsOneWidget);
+    expect(find.text('Mi perfil'), findsNothing);
   });
 
   testWidgets('welcome opens the register screen on step one', (tester) async {
@@ -231,30 +308,43 @@ void main() {
     expect(find.text('Viajes'), findsOneWidget);
     await tester.tap(find.text('Comenzar'));
     await tester.pumpAndSettle();
-    expect(profiles.interestIds, [6]);
-    expect(interests.createdNames, isNull);
+    expect(auth.interestIds, [6]);
+    expect(auth.newInterestNames, isEmpty);
   });
 
-  testWidgets('valid form signs up with a new interest and opens profile', (
-    tester,
-  ) async {
+  testWidgets(
+    'valid form signs up with a new interest and asks to confirm the email',
+    (tester) async {
+      await goToCharacterization(tester);
+      await tester.tap(find.text('Tecnología'));
+      await tester.enterText(find.byType(TextField).at(1), 'fotografía');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+      expect(find.text('Fotografía'), findsOneWidget);
+      await tester.tap(find.text('Comenzar'));
+      await tester.pumpAndSettle();
+
+      expect(auth.email, 'ana@memorylens.ai');
+      expect(auth.password, 'secreto123');
+      expect(auth.fullName, 'Ana Gómez');
+      expect(auth.city, 'Bogotá');
+      expect(auth.profession, 'Diseñadora');
+      expect(auth.interestIds, [1]);
+      expect(auth.newInterestNames, ['Fotografía']);
+      expect(find.text('Revisa tu correo'), findsOneWidget);
+      expect(find.textContaining('ana@memorylens.ai'), findsOneWidget);
+      expect(find.text('Mi perfil'), findsNothing);
+    },
+  );
+
+  testWidgets('confirm email screen leads to the login', (tester) async {
     await goToCharacterization(tester);
-    await tester.tap(find.text('Tecnología'));
-    await tester.enterText(find.byType(TextField).at(1), 'fotografía');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
-    expect(find.text('Fotografía'), findsOneWidget);
+    await tester.tap(find.text('Moda'));
     await tester.tap(find.text('Comenzar'));
     await tester.pumpAndSettle();
-
-    expect(auth.email, 'ana@memorylens.ai');
-    expect(auth.password, 'secreto123');
-    expect(profiles.profile?.fullName, 'Ana Gómez');
-    expect(profiles.profile?.city, 'Bogotá');
-    expect(profiles.profile?.profession, 'Diseñadora');
-    expect(interests.createdNames, ['Fotografía']);
-    expect(profiles.interestIds, unorderedEquals([1, 100]));
-    expect(find.text('Mi perfil'), findsOneWidget);
+    await tester.tap(find.text('Ir a iniciar sesión'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bienvenido de nuevo'), findsOneWidget);
   });
 
   testWidgets('sign up failure shows the message from the backend', (
