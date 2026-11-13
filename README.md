@@ -19,11 +19,11 @@ La `Project URL` y la `publishable key` de Supabase están en `lib/main.dart`.
 La app tiene **un solo tipo de usuario**: la persona dueña de la galería. 
 
 ```text
-Bienvenida ──► Registro (paso 1 → paso 2) ──► Confirma tu correo ──► Iniciar sesión ──► Mi perfil
-     │                                                                    ▲              │
-     └──────────────── Continuar con correo electrónico ─────────────────┘              │
-     ▲                                                                                   │
-     └───────────────────────────────── Cerrar sesión ◄─────────────────────────────────┘
+Bienvenida ──► Registro (paso 1 → paso 2) ──► Confirma tu correo ──► Iniciar sesión ──► Recuerdos ──► Analizando
+     │                                                                    ▲                │
+     └──────────────── Continuar con correo electrónico ─────────────────┘                ▼
+     ▲                                                                                 Mi perfil
+     └─────────────────────────────── Cerrar sesión ◄────────────────────────────────────┘
 ```
 
 ### 1. Bienvenida
@@ -57,13 +57,29 @@ Despues de confirmar toca **Ir a iniciar sesión**.
 
 ### 4. Iniciar sesión
 
-Escribe correo y contraseña y toca **Entrar**. Mensajes posibles:
+Escribe correo y contraseña y toca **Entrar**. Si todo va bien se abre **Recuerdos**. Mensajes posibles:
 
 - *"Correo o contraseña incorrectos"*.
 - *"Confirma tu correo antes de iniciar sesión"*: aún no se abrió el enlace del paso 3.
 
 
-### 5. Mi perfil
+### 5. Recuerdos
+
+Es la pantalla principal. Arriba a la derecha el icono de persona abre **Mi perfil**.
+
+- **Sin fotos todavía:** muestra *«Sin conectar»*, el contador *«0 fotos»*, *«Aún no tienes recuerdos»* y el botón **Permitir acceso a la galería**. Si la persona ya tiene fotos guardadas, esta invitación no aparece (la grilla de fotos llega con otra historia; por ahora hay un texto de relleno).
+- **Conectar la galería** necesita dos permisos, y sin ambos la app no lee ninguna foto:
+  1. Ventana propia *«Memory Lens quiere acceder a tus fotos»* con **No permitir** y **Permitir**. **No permitir** la cierra y deja todo como estaba: la app no vuelve a preguntar por su cuenta.
+  2. Con **Permitir** se pide el permiso del sistema. Si lo concede, se abre **Analizando**.
+- **Si el sistema dice que no:** aparece *«Sin acceso a tus fotos no hay recuerdos para analizar»* y el botón sigue disponible para intentarlo otra vez. Si el sistema ya no vuelve a preguntar (permiso bloqueado) el mensaje trae **Abrir ajustes**; al volver de los ajustes con el permiso activado la app sigue a **Analizando**.
+
+La app solo pide fotos con `permission_handler`, aislado en `GalleryPermissionDataSource`: en Android 13 o superior usa `READ_MEDIA_IMAGES`, en Android 12 o inferior el permiso de almacenamiento y en iOS `NSPhotoLibraryUsageDescription`. En iOS, si la persona elige solo algunas fotos (acceso limitado) cuenta como permiso concedido. En web y escritorio no hay permiso de fotos y se muestra un aviso.
+
+### 6. Analizando
+
+Por ahora solo confirma que ambos permisos están dados; la importación y el análisis de las fotos llegan con sus propias historias.
+
+### 7. Mi perfil
 
 Muestra tu nombre, profesión, ciudad, correo e intereses. **Cerrar sesión** te devuelve a la bienvenida.
 
@@ -120,6 +136,14 @@ lib/
       domain/            contrato y caso de uso para seguir la conexión
       data/              connectivity_plus detrás de un data source
       ui/                ConnectivityBloc y ConnectivityShell (muestra «Sin conexión»)
+    gallery_access/
+      domain/            estado del permiso (concedido, negado, bloqueado), contrato y casos de uso para pedirlo, revisarlo y abrir ajustes
+      data/              permission_handler y device_info_plus detrás de un data source
+    memories/
+      domain/            contrato y caso de uso para contar las fotos de la persona
+      data/              conteo en la tabla `foto` de Supabase
+      ui/                MemoriesBloc, pantalla Recuerdos, ventana propia de permiso y mensajes de acceso negado
+    analyzing/ui/        pantalla Analizando (por ahora solo un aviso)
     register/ui/         RegisterBloc y pantalla de registro con caracterización
     welcome/ui/          pantalla inicial con los botones a inicio de sesión y registro
     login/ui/            inicio de sesión
@@ -128,4 +152,4 @@ lib/
   main.dart
 ```
 
-`flutter test` comprueba la navegación de la pantalla inicial, las validaciones del formulario, que el registro guarda el perfil y los intereses, los mensajes de error y de falta de conexión, que los formularios conservan lo escrito tras un fallo, y el registro de errores con su pantalla y acción.
+`flutter test` comprueba la navegación de la pantalla inicial, las validaciones del formulario, que el registro guarda el perfil y los intereses, los mensajes de error y de falta de conexión, que los formularios conservan lo escrito tras un fallo, y el registro de errores con su pantalla y acción. También prueba el flujo de la galería: la ventana propia, que sin ella no se pide el permiso del sistema, el permiso negado y el bloqueado con **Abrir ajustes**, y que Recuerdos no muestra la invitación si ya hay fotos.
