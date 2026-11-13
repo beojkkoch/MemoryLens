@@ -38,6 +38,8 @@ dependencies:
   supabase_flutter: ^2.18.0
   get_it: ^9.3.0
   google_fonts: ^9.0.0
+  connectivity_plus: ^7.3.2
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
