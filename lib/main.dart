@@ -12,8 +12,12 @@ import 'package:memorylens/features/error_handling/ui/observers/screen_tracker.d
 import 'package:memorylens/injection_container.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:memorylens/features/analyzing/ui/screens/analyzing_screen.dart';
 import 'package:memorylens/features/login/ui/bloc/login_bloc.dart';
 import 'package:memorylens/features/login/ui/screens/login_screen.dart';
+import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
+import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
+import 'package:memorylens/features/memories/ui/screens/memories_screen.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_bloc.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_event.dart';
 import 'package:memorylens/features/profile/ui/screens/profile_screen.dart';
@@ -85,6 +89,11 @@ class App extends StatelessWidget {
             child: const RegisterScreen(),
           ),
           '/confirm-email': (_) => const ConfirmEmailScreen(),
+          '/recuerdos': (_) => BlocProvider(
+            create: (_) => sl<MemoriesBloc>()..add(MemoriesStarted()),
+            child: const MemoriesScreen(),
+          ),
+          '/analizando': (_) => const AnalyzingScreen(),
           '/profile': (_) => BlocProvider(
             create: (_) => sl<ProfileBloc>()..add(ProfileRequested()),
             child: const ProfileScreen(),

@@ -58,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
           current.status == LoginStatus.success &&
           previous.status != LoginStatus.success,
       listener: (context, state) {
-        Navigator.pushNamedAndRemoveUntil(context, '/profile', (_) => false);
+        Navigator.pushNamedAndRemoveUntil(context, '/recuerdos', (_) => false);
       },
       child: BlocBuilder<LoginBloc, LoginState>(
         builder: (context, state) {
