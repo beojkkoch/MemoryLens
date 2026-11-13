@@ -16,8 +16,18 @@ import 'package:memorylens/features/auth/domain/usecases/sign_out_usecase.dart';
 import 'package:memorylens/features/auth/domain/usecases/sign_up_usecase.dart';
 import 'package:memorylens/features/error_handling/data/mapper/exception_mapper.dart';
 import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
+import 'package:memorylens/features/analyzing/ui/screens/analyzing_screen.dart';
+import 'package:memorylens/features/gallery_access/domain/repository/gallery_permission_repository.dart';
+import 'package:memorylens/features/gallery_access/domain/usecases/check_gallery_access_usecase.dart';
+import 'package:memorylens/features/gallery_access/domain/usecases/open_gallery_settings_usecase.dart';
+import 'package:memorylens/features/gallery_access/domain/usecases/request_gallery_access_usecase.dart';
 import 'package:memorylens/features/login/ui/bloc/login_bloc.dart';
 import 'package:memorylens/features/login/ui/screens/login_screen.dart';
+import 'package:memorylens/features/memories/domain/repository/photo_repository.dart';
+import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
+import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
+import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
+import 'package:memorylens/features/memories/ui/screens/memories_screen.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_bloc.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_event.dart';
 import 'package:memorylens/features/profile/ui/screens/profile_screen.dart';
@@ -27,6 +37,9 @@ import 'package:memorylens/features/register/ui/screens/register_screen.dart';
 import 'package:memorylens/features/welcome/ui/screens/welcome_screen.dart';
 import 'package:memorylens/injection_container.dart';
 import 'package:memorylens/theme/app_theme.dart';
+
+import 'gallery_access/fake_gallery_permission_repository.dart';
+import 'memories/fake_photo_repository.dart';
 
 /// Records the sign up call instead of talking to Supabase Auth.
 class FakeAuthRepository implements AuthRepository {
@@ -132,6 +145,16 @@ void main() {
     sl.registerLazySingleton(() => SignInUsecase());
     sl.registerFactory(() => LoginBloc());
     sl.registerFactory(() => ProfileBloc());
+    // Login now lands on Recuerdos, which needs the gallery and photo fakes.
+    sl.registerSingleton<GalleryPermissionRepository>(
+      FakeGalleryPermissionRepository(),
+    );
+    sl.registerSingleton<PhotoRepository>(FakePhotoRepository());
+    sl.registerLazySingleton(() => RequestGalleryAccessUseCase());
+    sl.registerLazySingleton(() => CheckGalleryAccessUseCase());
+    sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
+    sl.registerLazySingleton(() => CountPhotosUseCase());
+    sl.registerFactory(() => MemoriesBloc());
   });
 
   Future<void> pumpApp(WidgetTester tester, {String route = '/'}) async {
@@ -152,6 +175,11 @@ void main() {
             child: const RegisterScreen(),
           ),
           '/confirm-email': (_) => const ConfirmEmailScreen(),
+          '/recuerdos': (_) => BlocProvider(
+            create: (_) => sl<MemoriesBloc>()..add(MemoriesStarted()),
+            child: const MemoriesScreen(),
+          ),
+          '/analizando': (_) => const AnalyzingScreen(),
           '/profile': (_) => BlocProvider(
             create: (_) => sl<ProfileBloc>()..add(ProfileRequested()),
             child: const ProfileScreen(),
@@ -196,7 +224,8 @@ void main() {
     expect(find.text('Iniciar sesión'), findsOneWidget);
   });
 
-  testWidgets('login with valid credentials opens the profile', (tester) async {
+  testWidgets('login with valid credentials opens Recuerdos and then the '
+      'profile', (tester) async {
     profiles.profile = const Profile(
       id: 'user-1',
       fullName: 'Ana Gómez',
@@ -212,6 +241,11 @@ void main() {
 
     expect(auth.email, 'ana@memorylens.ai');
     expect(auth.password, 'secreto123');
+    expect(find.text('Recuerdos'), findsOneWidget);
+    expect(find.text('Mi perfil'), findsNothing);
+
+    await tester.tap(find.byTooltip('Mi perfil'));
+    await tester.pumpAndSettle();
     expect(find.text('Mi perfil'), findsOneWidget);
     expect(find.text('Ana Gómez'), findsOneWidget);
   });
@@ -406,7 +440,7 @@ void main() {
       auth.error = null;
       await tester.tap(find.text('Entrar'));
       await tester.pumpAndSettle();
-      expect(find.text('Mi perfil'), findsOneWidget);
+      expect(find.text('Recuerdos'), findsOneWidget);
     });
 
     testWidgets('login with an unexpected error shows the generic message', (
