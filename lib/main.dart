@@ -13,6 +13,8 @@ import 'package:memorylens/injection_container.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:memorylens/features/analyzing/ui/screens/analyzing_screen.dart';
+import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_bloc.dart';
+import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_event.dart';
 import 'package:memorylens/features/login/ui/bloc/login_bloc.dart';
 import 'package:memorylens/features/login/ui/screens/login_screen.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
@@ -93,7 +95,10 @@ class App extends StatelessWidget {
             create: (_) => sl<MemoriesBloc>()..add(MemoriesStarted()),
             child: const MemoriesScreen(),
           ),
-          '/analizando': (_) => const AnalyzingScreen(),
+          '/analizando': (_) => BlocProvider(
+            create: (_) => sl<GalleryImportBloc>()..add(GalleryImportStarted()),
+            child: const AnalyzingScreen(),
+          ),
           '/profile': (_) => BlocProvider(
             create: (_) => sl<ProfileBloc>()..add(ProfileRequested()),
             child: const ProfileScreen(),

@@ -27,6 +27,19 @@ import 'package:memorylens/features/gallery_access/domain/repository/gallery_per
 import 'package:memorylens/features/gallery_access/domain/usecases/check_gallery_access_usecase.dart';
 import 'package:memorylens/features/gallery_access/domain/usecases/open_gallery_settings_usecase.dart';
 import 'package:memorylens/features/gallery_access/domain/usecases/request_gallery_access_usecase.dart';
+import 'package:memorylens/features/gallery_import/data/repository/device_gallery_repository_impl.dart';
+import 'package:memorylens/features/gallery_import/data/repository/import_scan_repository_impl.dart';
+import 'package:memorylens/features/gallery_import/data/repository/photo_import_repository_impl.dart';
+import 'package:memorylens/features/gallery_import/data/source/device_gallery_data_source.dart';
+import 'package:memorylens/features/gallery_import/data/source/supabase_import_scan_data_source.dart';
+import 'package:memorylens/features/gallery_import/data/source/supabase_imported_photo_data_source.dart';
+import 'package:memorylens/features/gallery_import/data/source/supabase_photo_storage_data_source.dart';
+import 'package:memorylens/features/gallery_import/domain/repository/device_gallery_repository.dart';
+import 'package:memorylens/features/gallery_import/domain/repository/import_scan_repository.dart';
+import 'package:memorylens/features/gallery_import/domain/repository/photo_import_repository.dart';
+import 'package:memorylens/features/gallery_import/domain/usecases/has_pending_import_usecase.dart';
+import 'package:memorylens/features/gallery_import/domain/usecases/import_gallery_photos_usecase.dart';
+import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_bloc.dart';
 import 'package:memorylens/features/memories/data/repository/photo_repository_impl.dart';
 import 'package:memorylens/features/memories/data/source/supabase_photo_data_source.dart';
 import 'package:memorylens/features/memories/domain/repository/photo_repository.dart';
@@ -50,6 +63,10 @@ void initDependencies() {
   sl.registerLazySingleton(() => ConnectivityDataSource());
   sl.registerLazySingleton(() => GalleryPermissionDataSource());
   sl.registerLazySingleton(() => SupabasePhotoDataSource());
+  sl.registerLazySingleton(() => DeviceGalleryDataSource());
+  sl.registerLazySingleton(() => SupabasePhotoStorageDataSource());
+  sl.registerLazySingleton(() => SupabaseImportedPhotoDataSource());
+  sl.registerLazySingleton(() => SupabaseImportScanDataSource());
 
   //Repositories
   sl.registerLazySingleton<AuthRepository>(() => AuthRepositoryImpl());
@@ -63,6 +80,15 @@ void initDependencies() {
     () => GalleryPermissionRepositoryImpl(),
   );
   sl.registerLazySingleton<PhotoRepository>(() => PhotoRepositoryImpl());
+  sl.registerLazySingleton<DeviceGalleryRepository>(
+    () => DeviceGalleryRepositoryImpl(),
+  );
+  sl.registerLazySingleton<PhotoImportRepository>(
+    () => PhotoImportRepositoryImpl(),
+  );
+  sl.registerLazySingleton<ImportScanRepository>(
+    () => ImportScanRepositoryImpl(),
+  );
 
   //Use cases
   sl.registerLazySingleton(() => GetInterestsUseCase());
@@ -76,6 +102,8 @@ void initDependencies() {
   sl.registerLazySingleton(() => CheckGalleryAccessUseCase());
   sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
   sl.registerLazySingleton(() => CountPhotosUseCase());
+  sl.registerLazySingleton(() => ImportGalleryPhotosUseCase());
+  sl.registerLazySingleton(() => HasPendingImportUseCase());
 
   //Observers
   sl.registerLazySingleton(() => ScreenTracker());
@@ -89,4 +117,5 @@ void initDependencies() {
   sl.registerFactory(() => ProfileBloc());
   sl.registerFactory(() => ConnectivityBloc());
   sl.registerFactory(() => MemoriesBloc());
+  sl.registerFactory(() => GalleryImportBloc());
 }
