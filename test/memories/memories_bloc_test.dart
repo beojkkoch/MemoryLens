@@ -13,11 +13,13 @@ import 'package:memorylens/features/memories/ui/bloc/memories_state.dart';
 import 'package:memorylens/injection_container.dart';
 
 import '../gallery_access/fake_gallery_permission_repository.dart';
+import '../gallery_import/gallery_import_test_setup.dart';
 import 'fake_photo_repository.dart';
 
 void main() {
   late FakeGalleryPermissionRepository permission;
   late FakePhotoRepository photos;
+  late GalleryImportFakes importFakes;
   late MemoriesBloc bloc;
 
   setUp(() async {
@@ -30,6 +32,8 @@ void main() {
     sl.registerLazySingleton(() => CheckGalleryAccessUseCase());
     sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
     sl.registerLazySingleton(() => CountPhotosUseCase());
+    // Recuerdos asks whether an import was left half done.
+    importFakes = registerGalleryImportFakes();
     bloc = MemoriesBloc();
   });
 
@@ -87,6 +91,73 @@ void main() {
 
       expect(bloc.state.status, MemoriesStatus.failure);
       expect(bloc.state.errorMessage, AppException.genericMessage);
+    });
+  });
+
+  group('an import left half done', () {
+    test('goes on to Analizando while the permission is still on', () async {
+      photos.photoCount = 3;
+      importFakes.scans.pending = true;
+      permission.checkResult = GalleryPermissionStatus.granted;
+
+      await send([MemoriesStarted()]);
+
+      expect(bloc.state.status, MemoriesStatus.ready);
+      expect(bloc.state.access, GalleryAccess.granted);
+    });
+
+    test('does not move on when the person took the permission away', () async {
+      importFakes.scans.pending = true;
+      permission.checkResult = GalleryPermissionStatus.blocked;
+
+      await send([MemoriesStarted()]);
+
+      expect(bloc.state.access, GalleryAccess.idle);
+    });
+
+    test('does not move on when nothing is pending', () async {
+      permission.checkResult = GalleryPermissionStatus.granted;
+
+      await send([MemoriesStarted()]);
+
+      expect(bloc.state.access, GalleryAccess.idle);
+      // Nothing pending, so the device is not even asked.
+      expect(permission.checkCalls, 0);
+    });
+
+    test('a finished import is not resumed', () async {
+      photos.photoCount = 3;
+      importFakes.scans.pending = false;
+      permission.checkResult = GalleryPermissionStatus.granted;
+
+      await send([MemoriesStarted()]);
+
+      expect(bloc.state.access, GalleryAccess.idle);
+    });
+
+    test('a failing check does not break Recuerdos', () async {
+      importFakes.scans.pendingError = const AppException(
+        'No pudimos conectarnos.',
+        kind: AppErrorKind.network,
+      );
+      permission.checkResult = GalleryPermissionStatus.granted;
+
+      await send([MemoriesStarted()]);
+
+      expect(bloc.state.status, MemoriesStatus.ready);
+      expect(bloc.state.access, GalleryAccess.idle);
+      expect(bloc.state.errorMessage, isNull);
+    });
+
+    test('is not looked for when the count already failed', () async {
+      photos.error = const AppException('No pudimos conectarnos.');
+      importFakes.scans.pending = true;
+      permission.checkResult = GalleryPermissionStatus.granted;
+
+      await send([MemoriesStarted()]);
+
+      expect(bloc.state.status, MemoriesStatus.failure);
+      expect(bloc.state.access, GalleryAccess.idle);
     });
   });
 

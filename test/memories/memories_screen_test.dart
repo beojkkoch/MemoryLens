@@ -22,6 +22,7 @@ import 'fake_photo_repository.dart';
 void main() {
   late FakeGalleryPermissionRepository permission;
   late FakePhotoRepository photos;
+  late GalleryImportFakes importFakes;
 
   const connectButton = 'Permitir acceso a la galería';
   const dialogTitle = 'Memory Lens quiere acceder a tus fotos';
@@ -41,8 +42,9 @@ void main() {
     sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
     sl.registerLazySingleton(() => CountPhotosUseCase());
     sl.registerFactory(() => MemoriesBloc());
-    // Analizando now imports the photos, so it needs the import fakes.
-    registerGalleryImportFakes();
+    // Analizando imports the photos, and Recuerdos asks if an import is
+    // pending, so both need the import fakes.
+    importFakes = registerGalleryImportFakes();
   });
 
   Future<void> pumpMemories(WidgetTester tester) async {
@@ -260,6 +262,22 @@ void main() {
       await settle(tester);
 
       expect(find.byType(AnalyzingScreen), findsOneWidget);
+    });
+
+    testWidgets('an import left half done opens Analizando on its own', (
+      tester,
+    ) async {
+      photos.photoCount = 2;
+      importFakes.scans.pending = true;
+      permission.checkResult = GalleryPermissionStatus.granted;
+
+      await pumpMemories(tester);
+      await settle(tester);
+
+      expect(find.byType(AnalyzingScreen), findsOneWidget);
+      // The person already agreed: no dialog, no system request.
+      expect(find.text(dialogTitle), findsNothing);
+      expect(permission.requestCalls, 0);
     });
 
     testWidgets('a plugin failure shows a friendly message', (tester) async {

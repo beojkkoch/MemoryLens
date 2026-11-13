@@ -4,6 +4,7 @@ import 'package:memorylens/features/gallery_access/domain/entities/gallery_permi
 import 'package:memorylens/features/gallery_access/domain/usecases/check_gallery_access_usecase.dart';
 import 'package:memorylens/features/gallery_access/domain/usecases/open_gallery_settings_usecase.dart';
 import 'package:memorylens/features/gallery_access/domain/usecases/request_gallery_access_usecase.dart';
+import 'package:memorylens/features/gallery_import/domain/usecases/has_pending_import_usecase.dart';
 import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_state.dart';
@@ -19,6 +20,7 @@ class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
   final RequestGalleryAccessUseCase _requestAccess = sl();
   final CheckGalleryAccessUseCase _checkAccess = sl();
   final OpenGallerySettingsUseCase _openSettings = sl();
+  final HasPendingImportUseCase _hasPendingImport = sl();
 
   MemoriesBloc() : super(const MemoriesState()) {
     on<MemoriesStarted>(_onStarted);
@@ -45,6 +47,25 @@ class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
           errorMessage: AppException.messageFor(e),
         ),
       );
+      return;
+    }
+    await _resumeImportIfPending(emit);
+  }
+
+  /// An import cut short (the app was closed in the middle of it) has to go on,
+  /// but once the first photo is in, the button that leads to Analizando is
+  /// gone. So when an import is pending and the permission is still on, the
+  /// flow moves on to Analizando by itself, as if the person had just allowed
+  /// the access.
+  Future<void> _resumeImportIfPending(Emitter<MemoriesState> emit) async {
+    try {
+      if (!await _hasPendingImport()) return;
+      final status = await _checkAccess();
+      if (status != GalleryPermissionStatus.granted || emit.isDone) return;
+      emit(state.copyWith(access: GalleryAccess.granted));
+    } catch (e, stack) {
+      // Nothing for the person to fix: Recuerdos works the same without it.
+      addError(e, stack);
     }
   }
 
