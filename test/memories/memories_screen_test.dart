@@ -16,11 +16,13 @@ import 'package:memorylens/features/memories/ui/screens/memories_screen.dart';
 import 'package:memorylens/injection_container.dart';
 
 import '../gallery_access/fake_gallery_permission_repository.dart';
+import '../gallery_import/gallery_import_test_setup.dart';
 import 'fake_photo_repository.dart';
 
 void main() {
   late FakeGalleryPermissionRepository permission;
   late FakePhotoRepository photos;
+  late GalleryImportFakes importFakes;
 
   const connectButton = 'Permitir acceso a la galería';
   const dialogTitle = 'Memory Lens quiere acceder a tus fotos';
@@ -40,6 +42,9 @@ void main() {
     sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
     sl.registerLazySingleton(() => CountPhotosUseCase());
     sl.registerFactory(() => MemoriesBloc());
+    // Analizando imports the photos, and Recuerdos asks if an import is
+    // pending, so both need the import fakes.
+    importFakes = registerGalleryImportFakes();
   });
 
   Future<void> pumpMemories(WidgetTester tester) async {
@@ -54,7 +59,7 @@ void main() {
             create: (_) => sl<MemoriesBloc>()..add(MemoriesStarted()),
             child: const MemoriesScreen(),
           ),
-          '/analizando': (_) => const AnalyzingScreen(),
+          '/analizando': (_) => analyzingRoute(),
         },
       ),
     );
@@ -62,7 +67,7 @@ void main() {
   }
 
   /// Lets the dialog close, the bloc answer and the screen change. It cannot
-  /// use pumpAndSettle because Analizando has a spinner that never stops.
+  /// use pumpAndSettle because Analizando can show a spinner that never stops.
   Future<void> settle(WidgetTester tester) async {
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 300));
@@ -257,6 +262,22 @@ void main() {
       await settle(tester);
 
       expect(find.byType(AnalyzingScreen), findsOneWidget);
+    });
+
+    testWidgets('an import left half done opens Analizando on its own', (
+      tester,
+    ) async {
+      photos.photoCount = 2;
+      importFakes.scans.pending = true;
+      permission.checkResult = GalleryPermissionStatus.granted;
+
+      await pumpMemories(tester);
+      await settle(tester);
+
+      expect(find.byType(AnalyzingScreen), findsOneWidget);
+      // The person already agreed: no dialog, no system request.
+      expect(find.text(dialogTitle), findsNothing);
+      expect(permission.requestCalls, 0);
     });
 
     testWidgets('a plugin failure shows a friendly message', (tester) async {

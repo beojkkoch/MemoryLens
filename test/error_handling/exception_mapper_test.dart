@@ -88,6 +88,50 @@ void main() {
       expectFriendly(mapped);
     });
 
+    test('a storage error without a status is a connection problem', () {
+      final mapped = ExceptionMapper.map(
+        const StorageException('Failed to fetch'),
+      );
+
+      expect(mapped.kind, AppErrorKind.network);
+      expect(mapped.message, contains('conexión'));
+      expectFriendly(mapped);
+    });
+
+    test('a storage request that times out is a timeout', () {
+      for (final status in ['408', '504']) {
+        final mapped = ExceptionMapper.map(
+          StorageException('Gateway timeout', statusCode: status),
+        );
+
+        expect(mapped.kind, AppErrorKind.timeout, reason: status);
+        expectFriendly(mapped);
+      }
+    });
+
+    test('a missing bucket or file is a not found error', () {
+      final mapped = ExceptionMapper.map(
+        const StorageException('Bucket not found', statusCode: '404'),
+      );
+
+      expect(mapped.kind, AppErrorKind.notFound);
+      expect(mapped.message, isNot(contains('Bucket')));
+      expectFriendly(mapped);
+    });
+
+    test('a refused upload is a server error without the backend text', () {
+      final mapped = ExceptionMapper.map(
+        const StorageException(
+          'new row violates row-level security policy',
+          statusCode: '403',
+        ),
+      );
+
+      expect(mapped.kind, AppErrorKind.server);
+      expect(mapped.message, isNot(contains('row-level')));
+      expectFriendly(mapped);
+    });
+
     test('an unknown auth failure does not leak the english backend text', () {
       final mapped = ExceptionMapper.map(
         const AuthException(

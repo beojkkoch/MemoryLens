@@ -16,7 +16,6 @@ import 'package:memorylens/features/auth/domain/usecases/sign_out_usecase.dart';
 import 'package:memorylens/features/auth/domain/usecases/sign_up_usecase.dart';
 import 'package:memorylens/features/error_handling/data/mapper/exception_mapper.dart';
 import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
-import 'package:memorylens/features/analyzing/ui/screens/analyzing_screen.dart';
 import 'package:memorylens/features/gallery_access/domain/repository/gallery_permission_repository.dart';
 import 'package:memorylens/features/gallery_access/domain/usecases/check_gallery_access_usecase.dart';
 import 'package:memorylens/features/gallery_access/domain/usecases/open_gallery_settings_usecase.dart';
@@ -39,6 +38,7 @@ import 'package:memorylens/injection_container.dart';
 import 'package:memorylens/theme/app_theme.dart';
 
 import 'gallery_access/fake_gallery_permission_repository.dart';
+import 'gallery_import/gallery_import_test_setup.dart';
 import 'memories/fake_photo_repository.dart';
 
 /// Records the sign up call instead of talking to Supabase Auth.
@@ -155,6 +155,8 @@ void main() {
     sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
     sl.registerLazySingleton(() => CountPhotosUseCase());
     sl.registerFactory(() => MemoriesBloc());
+    // Recuerdos leads to Analizando, which imports the photos.
+    registerGalleryImportFakes();
   });
 
   Future<void> pumpApp(WidgetTester tester, {String route = '/'}) async {
@@ -179,7 +181,7 @@ void main() {
             create: (_) => sl<MemoriesBloc>()..add(MemoriesStarted()),
             child: const MemoriesScreen(),
           ),
-          '/analizando': (_) => const AnalyzingScreen(),
+          '/analizando': (_) => analyzingRoute(),
           '/profile': (_) => BlocProvider(
             create: (_) => sl<ProfileBloc>()..add(ProfileRequested()),
             child: const ProfileScreen(),
