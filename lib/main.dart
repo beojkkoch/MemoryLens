@@ -1,5 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:memorylens/features/error_handling/domain/usecases/report_error_usecase.dart';
+import 'package:memorylens/features/error_handling/ui/global_error_handlers.dart';
+import 'package:memorylens/features/error_handling/ui/observers/error_bloc_observer.dart';
+import 'package:memorylens/features/error_handling/ui/observers/screen_tracker.dart';
 import 'package:memorylens/injection_container.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,11 +22,29 @@ import 'package:memorylens/theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Supabase.initialize(
-    url: 'https://vhavapudcqyvwycqizun.supabase.co',
-    publishableKey: 'sb_publishable_1frmhC5wlr2CPs3tWJhuXA_6Bruj-FY',
-  );
   initDependencies();
+  installGlobalErrorHandlers(
+    tracker: sl<ScreenTracker>(),
+    report: sl<ReportErrorUseCase>(),
+  );
+  Bloc.observer = sl<ErrorBlocObserver>();
+  try {
+    await Supabase.initialize(
+      url: 'https://vhavapudcqyvwycqizun.supabase.co',
+      publishableKey: 'sb_publishable_1frmhC5wlr2CPs3tWJhuXA_6Bruj-FY',
+    );
+  } catch (error, stack) {
+    // The app still opens: each screen shows its own friendly message when it
+    // needs the backend.
+    unawaited(
+      sl<ReportErrorUseCase>()(
+        screen: ScreenTracker.unknownScreen,
+        action: 'Supabase.initialize',
+        error: error,
+        stackTrace: stack,
+      ),
+    );
+  }
   runApp(const App());
 }
 
@@ -34,6 +58,7 @@ class App extends StatelessWidget {
       title: 'Memory Lens',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      navigatorObservers: [sl<ScreenTracker>()],
       builder: (context, child) => ColoredBox(
         color: AppColors.canvas,
         child: Center(
