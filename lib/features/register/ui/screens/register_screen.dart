@@ -398,10 +398,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (state.interestsStatus == InterestsStatus.failure) {
       return Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Text(
-              'No pudimos cargar los intereses',
-              style: TextStyle(color: AppColors.textSecondary),
+              state.interestsError ?? 'No pudimos cargar los intereses',
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
           ),
           TextButton(

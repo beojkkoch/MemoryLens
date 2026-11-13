@@ -1,5 +1,6 @@
 import 'package:memorylens/features/auth/domain/entities/interest.dart';
 import 'package:memorylens/features/auth/domain/entities/profile.dart';
+import 'package:memorylens/features/error_handling/data/mapper/exception_mapper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// The only file that reads the usuario and usuario_interes tables.
@@ -28,8 +29,8 @@ class SupabaseProfileDataSource {
             ),
         ],
       );
-    } on PostgrestException catch (e) {
-      throw Exception(e.message);
+    } catch (e, stack) {
+      Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
     }
   }
 }

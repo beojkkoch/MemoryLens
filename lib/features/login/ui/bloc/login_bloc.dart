@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:memorylens/features/auth/domain/usecases/sign_in_usecase.dart';
+import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
 import 'package:memorylens/features/login/ui/bloc/login_event.dart';
 import 'package:memorylens/features/login/ui/bloc/login_state.dart';
 import 'package:memorylens/injection_container.dart';
@@ -20,11 +21,14 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
     try {
       await _signIn(email: event.email, password: event.password);
       emit(state.copyWith(status: LoginStatus.success));
-    } on Exception catch (e) {
+    } catch (e, stack) {
+      // addError lets the error observer log it; the screen only gets the
+      // friendly message.
+      addError(e, stack);
       emit(
         state.copyWith(
           status: LoginStatus.failure,
-          errorMessage: e.toString().replaceFirst('Exception: ', ''),
+          errorMessage: AppException.messageFor(e),
         ),
       );
     }

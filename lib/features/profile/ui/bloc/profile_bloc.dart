@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:memorylens/features/auth/domain/usecases/get_profile_usecase.dart';
 import 'package:memorylens/features/auth/domain/usecases/sign_out_usecase.dart';
+import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_event.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_state.dart';
 import 'package:memorylens/injection_container.dart';
@@ -23,11 +24,12 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     try {
       final profile = await _getProfile();
       emit(state.copyWith(status: ProfileStatus.loaded, profile: profile));
-    } on Exception catch (e) {
+    } catch (e, stack) {
+      addError(e, stack);
       emit(
         state.copyWith(
           status: ProfileStatus.failure,
-          errorMessage: e.toString().replaceFirst('Exception: ', ''),
+          errorMessage: AppException.messageFor(e),
         ),
       );
     }
@@ -41,10 +43,13 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     try {
       await _signOut();
       emit(state.copyWith(status: ProfileStatus.signedOut));
-    } on Exception catch (e) {
+    } catch (e, stack) {
+      addError(e, stack);
+      // signingOut goes back to false so the button works again.
       emit(
         state.copyWith(
-          errorMessage: e.toString().replaceFirst('Exception: ', ''),
+          signingOut: false,
+          errorMessage: AppException.messageFor(e),
         ),
       );
     }

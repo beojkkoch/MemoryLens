@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:memorylens/components/interest_chip.dart';
 import 'package:memorylens/features/auth/domain/entities/app_user.dart';
 import 'package:memorylens/features/auth/domain/entities/interest.dart';
 import 'package:memorylens/features/auth/domain/entities/profile.dart';
@@ -12,6 +14,8 @@ import 'package:memorylens/features/auth/domain/usecases/get_profile_usecase.dar
 import 'package:memorylens/features/auth/domain/usecases/sign_in_usecase.dart';
 import 'package:memorylens/features/auth/domain/usecases/sign_out_usecase.dart';
 import 'package:memorylens/features/auth/domain/usecases/sign_up_usecase.dart';
+import 'package:memorylens/features/error_handling/data/mapper/exception_mapper.dart';
+import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
 import 'package:memorylens/features/login/ui/bloc/login_bloc.dart';
 import 'package:memorylens/features/login/ui/screens/login_screen.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_bloc.dart';
@@ -33,7 +37,8 @@ class FakeAuthRepository implements AuthRepository {
   String? profession;
   List<int>? interestIds;
   List<String>? newInterestNames;
-  Exception? error;
+  Object? error;
+  Object? signOutError;
 
   @override
   Future<AppUser> signUp({
@@ -68,8 +73,8 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> signOut() {
-    return Future.value();
+  Future<void> signOut() async {
+    if (signOutError != null) throw signOutError!;
   }
 
   @override
@@ -82,17 +87,22 @@ class FakeAuthRepository implements AuthRepository {
 /// Serves the profile the backend would have saved.
 class FakeProfileRepository implements ProfileRepository {
   late Profile profile;
+  Object? error;
 
   @override
   Future<Profile> getProfile(String userId) async {
+    if (error != null) throw error!;
     return profile;
   }
 }
 
 /// Serves part of the seeded catalog.
 class FakeInterestRepository implements InterestRepository {
+  Object? error;
+
   @override
   Future<List<Interest>> getInterests() async {
+    if (error != null) throw error!;
     return const [
       Interest(id: 1, name: 'Tecnología'),
       Interest(id: 2, name: 'Moda'),
@@ -217,7 +227,7 @@ void main() {
   testWidgets('login failure shows the message from the backend', (
     tester,
   ) async {
-    auth.error = Exception('Correo o contraseña incorrectos');
+    auth.error = const AppException('Correo o contraseña incorrectos');
     await pumpApp(tester, route: '/login');
     await tester.enterText(find.byType(TextField).at(0), 'ana@memorylens.ai');
     await tester.enterText(find.byType(TextField).at(1), 'mala-clave');
@@ -350,12 +360,150 @@ void main() {
   testWidgets('sign up failure shows the message from the backend', (
     tester,
   ) async {
-    auth.error = Exception('Ya existe una cuenta con ese correo');
+    auth.error = const AppException('Ya existe una cuenta con ese correo');
     await goToCharacterization(tester);
     await tester.tap(find.text('Moda'));
     await tester.tap(find.text('Comenzar'));
     await tester.pumpAndSettle();
     expect(find.text('Ya existe una cuenta con ese correo'), findsOneWidget);
     expect(find.text('Mi perfil'), findsNothing);
+  });
+
+  group('connection and unexpected failures', () {
+    final networkError = ExceptionMapper.map(
+      http.ClientException('Failed host lookup'),
+    );
+    const ana = Profile(
+      id: 'user-1',
+      fullName: 'Ana Gómez',
+      email: 'ana@memorylens.ai',
+      city: 'Bogotá',
+      profession: 'Diseñadora',
+    );
+
+    String typed(WidgetTester tester, int index) {
+      return tester
+          .widget<TextField>(find.byType(TextField).at(index))
+          .controller!
+          .text;
+    }
+
+    testWidgets('login without connection shows a friendly message and keeps '
+        'what was typed', (tester) async {
+      auth.error = networkError;
+      profiles.profile = ana;
+      await pumpApp(tester, route: '/login');
+      await tester.enterText(find.byType(TextField).at(0), 'ana@memorylens.ai');
+      await tester.enterText(find.byType(TextField).at(1), 'secreto123');
+      await tester.tap(find.text('Entrar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(networkError.message), findsOneWidget);
+      expect(find.textContaining('ClientException'), findsNothing);
+      expect(typed(tester, 0), 'ana@memorylens.ai');
+      expect(typed(tester, 1), 'secreto123');
+
+      auth.error = null;
+      await tester.tap(find.text('Entrar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mi perfil'), findsOneWidget);
+    });
+
+    testWidgets('login with an unexpected error shows the generic message', (
+      tester,
+    ) async {
+      auth.error = StateError('Bad state: secret detail');
+      await pumpApp(tester, route: '/login');
+      await tester.enterText(find.byType(TextField).at(0), 'ana@memorylens.ai');
+      await tester.enterText(find.byType(TextField).at(1), 'secreto123');
+      await tester.tap(find.text('Entrar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppException.genericMessage), findsOneWidget);
+      expect(find.textContaining('secret detail'), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('sign up without connection keeps the second step as it was', (
+      tester,
+    ) async {
+      auth.error = networkError;
+      await goToCharacterization(tester);
+      await tester.tap(find.text('Moda'));
+      await tester.tap(find.text('Comenzar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(networkError.message), findsOneWidget);
+      expect(typed(tester, 0), 'Diseñadora');
+      final chip = tester.widget<InterestChip>(
+        find.widgetWithText(InterestChip, 'Moda'),
+      );
+      expect(chip.selected, isTrue);
+
+      auth.error = null;
+      await tester.tap(find.text('Comenzar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Revisa tu correo'), findsOneWidget);
+    });
+
+    testWidgets('interests that fail to load offer a retry with the reason', (
+      tester,
+    ) async {
+      interests.error = networkError;
+      await goToCharacterization(tester);
+      expect(find.text(networkError.message), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+
+      interests.error = null;
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Viajes'), findsOneWidget);
+    });
+
+    testWidgets('profile that fails to load offers a retry that recovers', (
+      tester,
+    ) async {
+      auth.email = 'ana@memorylens.ai';
+      profiles.profile = ana;
+      profiles.error = networkError;
+      await pumpApp(tester, route: '/profile');
+
+      expect(find.text(networkError.message), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+
+      profiles.error = null;
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ana Gómez'), findsOneWidget);
+    });
+
+    testWidgets('profile hit by an unexpected error does not stay loading', (
+      tester,
+    ) async {
+      auth.email = 'ana@memorylens.ai';
+      profiles.error = TypeError();
+      await pumpApp(tester, route: '/profile');
+
+      expect(find.text(AppException.genericMessage), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('a failed sign out leaves the button usable again', (
+      tester,
+    ) async {
+      auth.email = 'ana@memorylens.ai';
+      profiles.profile = ana;
+      auth.signOutError = networkError;
+      await pumpApp(tester, route: '/profile');
+      await tester.tap(find.text('Cerrar sesión'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(networkError.message), findsOneWidget);
+      final button = tester.widget<OutlinedButton>(
+        find.byWidgetPredicate((widget) => widget is OutlinedButton),
+      );
+      expect(button.onPressed, isNotNull);
+    });
   });
 }
