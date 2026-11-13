@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:memorylens/components/error_message.dart';
+import 'package:memorylens/components/error_retry_view.dart';
 import 'package:memorylens/components/memory_lens_app_bar.dart';
-import 'package:memorylens/components/primary_button.dart';
 import 'package:memorylens/features/auth/domain/entities/profile.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_bloc.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_event.dart';
@@ -136,27 +136,16 @@ class _FailureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ErrorMessage(message: message),
-            const SizedBox(height: 24),
-            PrimaryButton(
-              label: 'Reintentar',
-              onPressed: () =>
-                  context.read<ProfileBloc>().add(ProfileRequested()),
-            ),
-            TextButton(
-              onPressed: () =>
-                  context.read<ProfileBloc>().add(ProfileSignOutRequested()),
-              child: const Text('Cerrar sesión'),
-            ),
-          ],
+    return ErrorRetryView(
+      message: message,
+      onRetry: () => context.read<ProfileBloc>().add(ProfileRequested()),
+      actions: [
+        TextButton(
+          onPressed: () =>
+              context.read<ProfileBloc>().add(ProfileSignOutRequested()),
+          child: const Text('Cerrar sesión'),
         ),
-      ),
+      ],
     );
   }
 }

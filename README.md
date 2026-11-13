@@ -67,6 +67,14 @@ Escribe correo y contraseña y toca **Entrar**. Mensajes posibles:
 
 Muestra tu nombre, profesión, ciudad, correo e intereses. **Cerrar sesión** te devuelve a la bienvenida.
 
+## Errores y falta de conexión
+
+- **Sin conexión:** si el dispositivo pierde la red aparece la franja *«Sin conexión»* arriba de cualquier pantalla y desaparece sola al reconectar. Solo detecta si hay red en el dispositivo; si hay wifi pero no hay internet, la pantalla que falle muestra el mensaje de conexión.
+- **Mensajes claros:** todo error llega a la pantalla en español y sin términos técnicos (por ejemplo, *«No pudimos conectarnos. Revisa tu conexión a internet e inténtalo de nuevo.»*). Las pantallas que cargan datos (perfil, intereses) ofrecen **Reintentar**.
+- **No se pierde lo escrito:** cuando una acción falla, el formulario queda como estaba. Los campos viven en el `State` de la pantalla y el BLoC solo emite `failure`; nunca los reinicia. Las próximas pantallas de guardar, buscar e importar deben seguir esa regla y usar `ErrorRetryView` para los errores de carga.
+- **Registro para el equipo:** los errores técnicos se guardan en la tabla `registro_error` con la pantalla (`pantalla`), la acción (`accion`, el evento del BLoC), el tipo, el mensaje y el stack trace. Los errores normales, como una contraseña incorrecta, no se guardan. La tabla solo permite insertar; el equipo la lee desde Dashboard › Table Editor. Si no hay conexión al fallar, ese error no queda registrado.
+- **La app no se cierra:** `main.dart` registra `FlutterError.onError` y `PlatformDispatcher.onError`; un widget que falla se reemplaza por *«Algo salió mal en esta sección»* y un BLoC que falla vuelve a un estado con **Reintentar**.
+
 
 ## Supabase
 
@@ -88,6 +96,7 @@ Basado en el modelo entidad-relación del proyecto:
 - **Cuenta y acceso:** `usuario`, `interes`, `usuario_interes`, `escaneo_galeria`.
 - **Fotos y etiquetas:** `categoria`, `foto`, `etiqueta`, `foto_etiqueta`.
 - **Búsqueda con IA (chat):** `conversacion`, `mensaje`, `resultado_mensaje`.
+- **Errores de la app:** `registro_error` (solo inserción, sin lectura desde la app).
 
 `usuario.id` es el mismo id de `auth.users`. La contraseña la guarda Supabase Auth, por eso `usuario` no tiene `contrasena_hash`, y `correo` se copia de `auth.users` con un trigger. Todas las tablas tienen RLS: cada usuario solo ve y modifica sus propias filas; `interes`, `categoria` y `etiqueta` son catálogos.
 
@@ -97,18 +106,26 @@ Clean architecture por features, como en el laboratorio del curso:
 
 ```text
 lib/
-  components/            widgets compartidos (botón, error, logo, chip de interés, app bar)
+  components/            widgets compartidos (botón, error, reintentar, franja sin conexión, logo, chip de interés, app bar)
   theme/                 colores y tema tomados del prototipo de Lovable
   features/
     auth/
       domain/            entidades, contratos de repositorio y casos de uso
       data/              data sources de Supabase e implementaciones de los repositorios
+    error_handling/
+      domain/            AppException (mensaje en español), ErrorReport y ReportErrorUseCase
+      data/              ExceptionMapper (error crudo → mensaje claro) y escritura en registro_error
+      ui/                observers del BLoC y de la pantalla actual, y handlers globales de errores
+    connectivity/
+      domain/            contrato y caso de uso para seguir la conexión
+      data/              connectivity_plus detrás de un data source
+      ui/                ConnectivityBloc y ConnectivityShell (muestra «Sin conexión»)
     register/ui/         RegisterBloc y pantalla de registro con caracterización
     welcome/ui/          pantalla inicial con los botones a inicio de sesión y registro
-    login/ui/            inicio de sesión (pendiente)
-    profile/ui/          resumen del perfil (pendiente)
+    login/ui/            inicio de sesión
+    profile/ui/          resumen del perfil
   injection_container.dart
   main.dart
 ```
 
-`flutter test` comprueba la navegación de la pantalla inicial, las validaciones del formulario y que el registro guarda el perfil y los intereses.
+`flutter test` comprueba la navegación de la pantalla inicial, las validaciones del formulario, que el registro guarda el perfil y los intereses, los mensajes de error y de falta de conexión, que los formularios conservan lo escrito tras un fallo, y el registro de errores con su pantalla y acción.
