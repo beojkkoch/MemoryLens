@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:memorylens/features/auth/domain/usecases/get_interests_usecase.dart';
 import 'package:memorylens/features/auth/domain/usecases/sign_up_usecase.dart';
+import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
 import 'package:memorylens/features/register/ui/bloc/register_event.dart';
 import 'package:memorylens/features/register/ui/bloc/register_state.dart';
 import 'package:memorylens/injection_container.dart';
@@ -28,8 +29,14 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
           interests: interests,
         ),
       );
-    } on Exception {
-      emit(state.copyWith(interestsStatus: InterestsStatus.failure));
+    } catch (e, stack) {
+      addError(e, stack);
+      emit(
+        state.copyWith(
+          interestsStatus: InterestsStatus.failure,
+          interestsError: AppException.messageFor(e),
+        ),
+      );
     }
   }
 
@@ -49,11 +56,12 @@ class RegisterBloc extends Bloc<RegisterEvent, RegisterState> {
         newInterestNames: event.newInterestNames,
       );
       emit(state.copyWith(status: RegisterStatus.success));
-    } on Exception catch (e) {
+    } catch (e, stack) {
+      addError(e, stack);
       emit(
         state.copyWith(
           status: RegisterStatus.failure,
-          errorMessage: e.toString().replaceFirst('Exception: ', ''),
+          errorMessage: AppException.messageFor(e),
         ),
       );
     }

@@ -11,11 +11,15 @@ class RegisterState {
   final List<Interest> interests;
   final String? errorMessage;
 
+  /// Why the interests could not load; only read while interestsStatus fails.
+  final String? interestsError;
+
   const RegisterState({
     this.status = RegisterStatus.initial,
     this.interestsStatus = InterestsStatus.loading,
     this.interests = const [],
     this.errorMessage,
+    this.interestsError,
   });
 
   RegisterState copyWith({
@@ -23,12 +27,14 @@ class RegisterState {
     InterestsStatus? interestsStatus,
     List<Interest>? interests,
     String? errorMessage,
+    String? interestsError,
   }) {
     return RegisterState(
       status: status ?? this.status,
       interestsStatus: interestsStatus ?? this.interestsStatus,
       interests: interests ?? this.interests,
       errorMessage: errorMessage ?? this.errorMessage,
+      interestsError: interestsError ?? this.interestsError,
     );
   }
 
