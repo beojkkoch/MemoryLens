@@ -48,6 +48,9 @@ class ExceptionMapper {
         cause: error,
       );
     }
+    if (error is StorageException) {
+      return _mapStorage(error);
+    }
     if (error is AuthException) {
       return AppException(
         _serverMessage,
@@ -58,6 +61,38 @@ class ExceptionMapper {
     return AppException(
       AppException.genericMessage,
       kind: AppErrorKind.unknown,
+      cause: error,
+    );
+  }
+
+  /// Storage answers with an HTTP status. Without one the request did not get
+  /// a proper answer, which is treated as a connection problem.
+  static AppException _mapStorage(StorageException error) {
+    final status = int.tryParse(error.statusCode ?? '');
+    if (status == null) {
+      return AppException(
+        _networkMessage,
+        kind: AppErrorKind.network,
+        cause: error,
+      );
+    }
+    if (status == 408 || status == 504) {
+      return AppException(
+        _timeoutMessage,
+        kind: AppErrorKind.timeout,
+        cause: error,
+      );
+    }
+    if (status == 404) {
+      return AppException(
+        _notFoundMessage,
+        kind: AppErrorKind.notFound,
+        cause: error,
+      );
+    }
+    return AppException(
+      _serverMessage,
+      kind: AppErrorKind.server,
       cause: error,
     );
   }

@@ -1,7 +1,8 @@
 import 'package:memorylens/features/error_handling/data/mapper/exception_mapper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// The only file that reads the foto table.
+/// The only file that counts the rows of the foto table. The import writes
+/// them from its own data source.
 class SupabasePhotoDataSource {
   final SupabaseClient _client = Supabase.instance.client;
 
