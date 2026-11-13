@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:memorylens/features/gallery_import/domain/entities/device_gallery_photo.dart';
@@ -26,6 +27,9 @@ class FakePhotoImportRepository implements PhotoImportRepository {
   /// Thrown by [importedAssetIds] when set.
   Object? importedIdsError;
 
+  /// While set, every upload waits for it. Keeps an import half done.
+  Completer<void>? gate;
+
   @override
   Future<Set<String>> importedAssetIds() async {
     log.add('imported-ids');
@@ -41,6 +45,7 @@ class FakePhotoImportRepository implements PhotoImportRepository {
   }) async {
     log.add('upload:$assetId');
     uploadCounts[assetId] = (uploadCounts[assetId] ?? 0) + 1;
+    await gate?.future;
     final error = uploadErrors[assetId];
     if (error != null) throw error;
     return StoredPhoto(

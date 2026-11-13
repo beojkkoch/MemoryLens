@@ -82,6 +82,8 @@ class GalleryImportBloc extends Bloc<GalleryImportEvent, GalleryImportState> {
           _watch().where((online) => online).take(1),
           onData: (_) => state,
         );
+        // Closing the bloc also ends the wait above: do not go on after that.
+        if (emit.isDone) return;
         await Future<void>.delayed(_retryDelay);
         if (emit.isDone) return;
         emit(state.copyWith(status: GalleryImportStatus.importing));
