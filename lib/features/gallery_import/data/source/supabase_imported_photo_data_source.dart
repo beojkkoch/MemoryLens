@@ -18,23 +18,33 @@ class SupabaseImportedPhotoDataSource {
   /// each person their own photos.
   Future<Set<String>> importedAssetIds() async {
     try {
-      final ids = <String>{};
-      var from = 0;
-      while (true) {
-        final rows = await _client
+      return await collectAssetIds(
+        (from, to) => _client
             .from('foto')
             .select('asset_id')
             .not('asset_id', 'is', null)
             .order('id')
-            .range(from, from + pageSize - 1);
-        for (final row in rows) {
-          ids.add(row['asset_id'] as String);
-        }
-        if (rows.length < pageSize) return ids;
-        from += pageSize;
-      }
+            .range(from, to),
+      );
     } catch (e, stack) {
       Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
+    }
+  }
+
+  /// Keeps asking for pages until one comes back short. [fetchPage] gets the
+  /// first and the last row of the page, both included.
+  static Future<Set<String>> collectAssetIds(
+    Future<List<Map<String, dynamic>>> Function(int from, int to) fetchPage,
+  ) async {
+    final ids = <String>{};
+    var from = 0;
+    while (true) {
+      final rows = await fetchPage(from, from + pageSize - 1);
+      for (final row in rows) {
+        ids.add(row['asset_id'] as String);
+      }
+      if (rows.length < pageSize) return ids;
+      from += pageSize;
     }
   }
 
@@ -44,14 +54,20 @@ class SupabaseImportedPhotoDataSource {
     required StoredPhoto stored,
   }) async {
     try {
-      await _client.from('foto').upsert({
-        'usuario_id': signedInUserId(_client),
-        'asset_id': photo.assetId,
-        'url_imagen': stored.imagePath,
-        'ruta_miniatura': stored.thumbnailPath,
-        'fecha_captura': photo.takenAt?.toUtc().toIso8601String(),
-        'origen': 'galeria',
-      }, onConflict: 'usuario_id,asset_id', ignoreDuplicates: true);
+      await _client
+          .from('foto')
+          .upsert(
+            {
+              'usuario_id': signedInUserId(_client),
+              'asset_id': photo.assetId,
+              'url_imagen': stored.imagePath,
+              'ruta_miniatura': stored.thumbnailPath,
+              'fecha_captura': photo.takenAt?.toUtc().toIso8601String(),
+              'origen': 'galeria',
+            },
+            onConflict: 'usuario_id,asset_id',
+            ignoreDuplicates: true,
+          );
     } catch (e, stack) {
       Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
     }
