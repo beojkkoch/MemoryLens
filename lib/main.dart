@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:memorylens/features/connectivity/ui/bloc/connectivity_bloc.dart';
+import 'package:memorylens/features/connectivity/ui/bloc/connectivity_event.dart';
+import 'package:memorylens/features/connectivity/ui/widgets/connectivity_shell.dart';
 import 'package:memorylens/features/error_handling/domain/usecases/report_error_usecase.dart';
 import 'package:memorylens/features/error_handling/ui/global_error_handlers.dart';
 import 'package:memorylens/features/error_handling/ui/observers/error_bloc_observer.dart';
@@ -54,37 +57,40 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Memory Lens',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      navigatorObservers: [sl<ScreenTracker>()],
-      builder: (context, child) => ColoredBox(
-        color: AppColors.canvas,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 430),
-            child: child,
+    return BlocProvider(
+      create: (_) => sl<ConnectivityBloc>()..add(ConnectivityStarted()),
+      child: MaterialApp(
+        title: 'Memory Lens',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        navigatorObservers: [sl<ScreenTracker>()],
+        builder: (context, child) => ColoredBox(
+          color: AppColors.canvas,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: ConnectivityShell(child: child!),
+            ),
           ),
         ),
+        initialRoute: '/',
+        routes: {
+          '/': (_) => const WelcomeScreen(),
+          '/login': (_) => BlocProvider(
+            create: (_) => sl<LoginBloc>(),
+            child: const LoginScreen(),
+          ),
+          '/register': (_) => BlocProvider(
+            create: (_) => sl<RegisterBloc>(),
+            child: const RegisterScreen(),
+          ),
+          '/confirm-email': (_) => const ConfirmEmailScreen(),
+          '/profile': (_) => BlocProvider(
+            create: (_) => sl<ProfileBloc>()..add(ProfileRequested()),
+            child: const ProfileScreen(),
+          ),
+        },
       ),
-      initialRoute: '/',
-      routes: {
-        '/': (_) => const WelcomeScreen(),
-        '/login': (_) => BlocProvider(
-          create: (_) => sl<LoginBloc>(),
-          child: const LoginScreen(),
-        ),
-        '/register': (_) => BlocProvider(
-          create: (_) => sl<RegisterBloc>(),
-          child: const RegisterScreen(),
-        ),
-        '/confirm-email': (_) => const ConfirmEmailScreen(),
-        '/profile': (_) => BlocProvider(
-          create: (_) => sl<ProfileBloc>()..add(ProfileRequested()),
-          child: const ProfileScreen(),
-        ),
-      },
     );
   }
 }

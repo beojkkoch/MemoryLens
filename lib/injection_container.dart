@@ -10,6 +10,11 @@ import 'package:memorylens/features/auth/domain/repository/interest_repository.d
 import 'package:memorylens/features/auth/domain/repository/profile_repository.dart';
 import 'package:memorylens/features/auth/domain/usecases/get_interests_usecase.dart';
 import 'package:memorylens/features/auth/domain/usecases/get_profile_usecase.dart';
+import 'package:memorylens/features/connectivity/data/repository/connectivity_repository_impl.dart';
+import 'package:memorylens/features/connectivity/data/source/connectivity_data_source.dart';
+import 'package:memorylens/features/connectivity/domain/repository/connectivity_repository.dart';
+import 'package:memorylens/features/connectivity/domain/usecases/watch_connectivity_usecase.dart';
+import 'package:memorylens/features/connectivity/ui/bloc/connectivity_bloc.dart';
 import 'package:memorylens/features/error_handling/data/repository/error_log_repository_impl.dart';
 import 'package:memorylens/features/error_handling/data/source/supabase_error_log_data_source.dart';
 import 'package:memorylens/features/error_handling/domain/repository/error_log_repository.dart';
@@ -31,12 +36,16 @@ void initDependencies() {
   sl.registerLazySingleton(() => SupabaseProfileDataSource());
   sl.registerLazySingleton(() => SupabaseInterestDataSource());
   sl.registerLazySingleton(() => SupabaseErrorLogDataSource());
+  sl.registerLazySingleton(() => ConnectivityDataSource());
 
   //Repositories
   sl.registerLazySingleton<AuthRepository>(() => AuthRepositoryImpl());
   sl.registerLazySingleton<ProfileRepository>(() => ProfileRepositoryImpl());
   sl.registerLazySingleton<InterestRepository>(() => InterestRepositoryImpl());
   sl.registerLazySingleton<ErrorLogRepository>(() => ErrorLogRepositoryImpl());
+  sl.registerLazySingleton<ConnectivityRepository>(
+    () => ConnectivityRepositoryImpl(),
+  );
 
   //Use cases
   sl.registerLazySingleton(() => GetInterestsUseCase());
@@ -45,6 +54,7 @@ void initDependencies() {
   sl.registerLazySingleton(() => SignOutUsecase());
   sl.registerLazySingleton(() => GetProfileUseCase());
   sl.registerLazySingleton(() => ReportErrorUseCase());
+  sl.registerLazySingleton(() => WatchConnectivityUseCase());
 
   //Observers
   sl.registerLazySingleton(() => ScreenTracker());
@@ -56,4 +66,5 @@ void initDependencies() {
   sl.registerFactory(() => RegisterBloc());
   sl.registerFactory(() => LoginBloc());
   sl.registerFactory(() => ProfileBloc());
+  sl.registerFactory(() => ConnectivityBloc());
 }
