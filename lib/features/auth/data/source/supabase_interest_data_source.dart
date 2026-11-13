@@ -1,4 +1,5 @@
 import 'package:memorylens/features/auth/domain/entities/interest.dart';
+import 'package:memorylens/features/error_handling/data/mapper/exception_mapper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// The only file that reads the interes catalog.
@@ -12,8 +13,8 @@ class SupabaseInterestDataSource {
           .select()
           .order('id', ascending: true);
       return rows.map(_toInterest).toList();
-    } on PostgrestException catch (e) {
-      throw Exception(e.message);
+    } catch (e, stack) {
+      Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
     }
   }
 
