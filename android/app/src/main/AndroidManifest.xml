@@ -2,6 +2,12 @@
     <!-- Network access for Supabase and the connectivity banner. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Read the photo gallery: images permission on Android 13+, the old
+         storage permission only on Android 12 and below. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
     <application
         android:label="memorylens"
         android:name="${applicationName}"
