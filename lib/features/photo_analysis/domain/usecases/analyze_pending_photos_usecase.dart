@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math';
 
 import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
 import 'package:memorylens/features/photo_analysis/domain/entities/analysis_busy_exception.dart';
@@ -37,31 +38,43 @@ class AnalyzePendingPhotosUseCase {
   /// not the fault of the photo.
   static const maxBusyRetries = 4;
 
+  /// Most time the screen goes without news (HU-10, CA3 asks for 5 s). A
+  /// call to the AI can take longer than that, so meanwhile the counts saved
+  /// in the account are read again.
+  static const refreshInterval = Duration(seconds: 4);
+
   static const busyMessage =
       'El servicio de análisis está muy ocupado. Inténtalo de nuevo en unos '
       'minutos.';
 
   final PhotoAnalysisRepository _analysis = sl();
   final Future<void> Function(Duration) _wait;
+  final Duration _refreshEvery;
 
   /// [wait] is how the pauses are waited, so tests do not have to wait for
-  /// real.
-  AnalyzePendingPhotosUseCase({Future<void> Function(Duration)? wait})
-    : _wait = wait ?? Future<void>.delayed;
+  /// real. [refreshEvery] is how often the saved counts are read while the
+  /// calls work.
+  AnalyzePendingPhotosUseCase({
+    Future<void> Function(Duration)? wait,
+    this._refreshEvery = refreshInterval,
+  }) : _wait = wait ?? Future<void>.delayed;
 
-  /// Emits the real progress at the start and every time a call ends, and
-  /// ends when no photo is left waiting. A lost connection or an AI that
+  /// Emits the real progress at the start, every time a call ends and at
+  /// least every [refreshInterval] while it works, and ends when no photo is
+  /// left waiting. A lost connection or an AI that
   /// stays busy is thrown once the calls already running are over.
   Stream<AnalysisProgress> call() {
     var cancelled = false;
+    Timer? ticker;
     late final StreamController<AnalysisProgress> controller;
     controller = StreamController<AnalysisProgress>(
       onListen: () async {
         try {
-          await _run(controller.add, () => cancelled);
+          await _run(controller.add, () => cancelled, (t) => ticker = t);
         } catch (e, stack) {
           if (!cancelled) controller.addError(e, stack);
         } finally {
+          ticker?.cancel();
           if (!cancelled) await controller.close();
         }
       },
@@ -69,6 +82,7 @@ class AnalyzePendingPhotosUseCase {
       // new one starts.
       onCancel: () {
         cancelled = true;
+        ticker?.cancel();
       },
     );
     return controller.stream;
@@ -77,15 +91,53 @@ class AnalyzePendingPhotosUseCase {
   Future<void> _run(
     void Function(AnalysisProgress) emit,
     bool Function() cancelled,
+    void Function(Timer) keepTicker,
   ) async {
     final backlog = await _analysis.backlog();
     final total = backlog.analyzed + backlog.failed + backlog.pendingIds.length;
     var analyzed = backlog.analyzed;
     var failed = backlog.failed;
-    void report() => emit(
-      AnalysisProgress(total: total, analyzed: analyzed, failed: failed),
-    );
+    // What the account had saved at the last refresh. A call saves each photo
+    // as soon as it is described, before it answers, so this can be ahead.
+    var savedAnalyzed = analyzed;
+    var savedFailed = failed;
+    var finished = false;
+    void report() {
+      final shownAnalyzed = max(analyzed, savedAnalyzed).clamp(0, total);
+      final shownFailed = max(
+        failed,
+        savedFailed,
+      ).clamp(0, total - shownAnalyzed);
+      emit(
+        AnalysisProgress(
+          total: total,
+          analyzed: shownAnalyzed,
+          failed: shownFailed,
+        ),
+      );
+    }
+
     report();
+
+    var refreshing = false;
+    keepTicker(
+      Timer.periodic(_refreshEvery, (_) async {
+        if (refreshing || finished || cancelled()) return;
+        refreshing = true;
+        try {
+          final saved = await _analysis.doneCounts();
+          savedAnalyzed = saved.analyzed;
+          savedFailed = saved.failed;
+        } catch (_) {
+          // The last numbers are still true. If the connection dropped, the
+          // calls are the ones that tell.
+        } finally {
+          refreshing = false;
+        }
+        // Even with no change, the screen hears that the analysis is alive.
+        if (!finished && !cancelled()) report();
+      }),
+    );
 
     final queue = Queue<String>.of(backlog.pendingIds);
     // Times each photo went back to the queue in this run. The server keeps
@@ -128,6 +180,7 @@ class AnalyzePendingPhotosUseCase {
     }
 
     await Future.wait(List.generate(parallelCalls, (_) => worker()));
+    finished = true;
     final stopped = stop;
     if (stopped != null) {
       Error.throwWithStackTrace(stopped.error, stopped.stack);

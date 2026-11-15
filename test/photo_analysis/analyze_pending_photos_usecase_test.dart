@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
 import 'package:memorylens/features/photo_analysis/domain/entities/analysis_busy_exception.dart';
@@ -162,6 +164,53 @@ void main() {
     );
     expect(waits, hasLength(AnalyzePendingPhotosUseCase.maxBusyRetries));
     expect(analysis.done, isEmpty);
+  });
+
+  test(
+    'while a call works, the saved counts are read again (HU-10, CA3)',
+    () async {
+      analysis.extraPhotos.addAll(photos(4));
+      analysis.gate = Completer<void>();
+      analyze = AnalyzePendingPhotosUseCase(
+        wait: (d) async => waits.add(d),
+        refreshEvery: const Duration(milliseconds: 10),
+      );
+      final emitted = <AnalysisProgress>[];
+      final done = analyze().forEach(emitted.add);
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(
+        emitted.length,
+        greaterThan(1),
+        reason: 'news even with no change',
+      );
+      expect(emitted.last.analyzed, 0);
+
+      // The function already saved f0 but has not answered yet.
+      analysis.done['f0'] = PhotoAnalysisOutcome.analyzed;
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(emitted.last.analyzed, 1);
+
+      analysis.gate!.complete();
+      await done;
+      // The answer of the call does not count f0 twice.
+      expect(emitted.last.analyzed, 4);
+      expect(emitted.last.total, 4);
+    },
+  );
+
+  test('the refresh stops when the run ends', () async {
+    analysis.extraPhotos.addAll(photos(2));
+    analyze = AnalyzePendingPhotosUseCase(
+      wait: (d) async => waits.add(d),
+      refreshEvery: const Duration(milliseconds: 5),
+    );
+
+    await analyze().toList();
+    final reads = analysis.doneCountsCalls;
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    expect(analysis.doneCountsCalls, reads);
   });
 
   test(

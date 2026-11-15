@@ -10,6 +10,14 @@ abstract class PhotoAnalysisRepository {
   /// The photos still waiting and how many are already done.
   Future<AnalysisBacklog> backlog();
 
+  /// Photos analyzed and «No analizada» right now, as saved. Can be ahead of
+  /// what a run counted, since a call saves its photos before it answers.
+  Future<({int analyzed, int failed})> doneCounts();
+
+  /// Puts every «No analizada» photo back in the queue, with its attempts
+  /// again (HU-10, CA8). Returns how many went back.
+  Future<int> retryFailed();
+
   /// Whether any imported photo is still waiting for the AI.
   Future<bool> hasPendingAnalysis();
 

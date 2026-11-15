@@ -54,6 +54,15 @@ class FakePhotoAnalysisRepository implements PhotoAnalysisRepository {
   /// Thrown by [backlog] when set.
   Object? backlogError;
 
+  /// Thrown by [retryFailed] when set.
+  Object? retryFailedError;
+
+  /// Times [retryFailed] was called.
+  int retryFailedCalls = 0;
+
+  /// Times [doneCounts] was called.
+  int doneCountsCalls = 0;
+
   Iterable<String> get _imported => _importedIds?.call() ?? extraPhotos;
 
   @override
@@ -66,6 +75,33 @@ class FakePhotoAnalysisRepository implements PhotoAnalysisRepository {
           .length,
       failed: done.values.where((o) => o == PhotoAnalysisOutcome.failed).length,
     );
+  }
+
+  @override
+  Future<({int analyzed, int failed})> doneCounts() async {
+    doneCountsCalls++;
+    return (
+      analyzed: done.values
+          .where((o) => o == PhotoAnalysisOutcome.analyzed)
+          .length,
+      failed: done.values.where((o) => o == PhotoAnalysisOutcome.failed).length,
+    );
+  }
+
+  /// Like reintentar_fotos_no_analizadas: back to pending, attempts at 0.
+  @override
+  Future<int> retryFailed() async {
+    retryFailedCalls++;
+    if (retryFailedError != null) throw retryFailedError!;
+    final failed = done.entries
+        .where((e) => e.value == PhotoAnalysisOutcome.failed)
+        .map((e) => e.key)
+        .toList();
+    for (final id in failed) {
+      done.remove(id);
+      attempts.remove(id);
+    }
+    return failed.length;
   }
 
   @override

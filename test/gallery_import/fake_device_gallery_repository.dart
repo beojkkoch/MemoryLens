@@ -13,8 +13,12 @@ class FakeDeviceGalleryRepository implements DeviceGalleryRepository {
   /// Thrown by [listPhotos] when set.
   Object? listError;
 
+  /// Times the gallery was read.
+  int listCalls = 0;
+
   @override
   Future<List<DeviceGalleryPhoto>> listPhotos() async {
+    listCalls++;
     if (listError != null) throw listError!;
     return List.of(photos);
   }

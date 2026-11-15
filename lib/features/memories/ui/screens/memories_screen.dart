@@ -12,6 +12,7 @@ import 'package:memorylens/features/memories/ui/widgets/access_denied_notice.dar
 import 'package:memorylens/features/memories/ui/widgets/empty_memories_view.dart';
 import 'package:memorylens/features/memories/ui/widgets/gallery_consent_dialog.dart';
 import 'package:memorylens/features/memories/ui/widgets/memories_header.dart';
+import 'package:memorylens/features/memories/ui/widgets/new_photos_notice.dart';
 import 'package:memorylens/theme/app_theme.dart';
 
 /// Home of the app. While the gallery is not connected it invites the person
@@ -114,6 +115,19 @@ class _MemoriesScreenState extends State<MemoriesScreen>
               connected: state.hasPhotos,
               photoCount: state.photoCount,
             ),
+            if (state.newPhotos > 0) NewPhotosProgress(count: state.newPhotos),
+            if (state.newPhotosAnalyzed > 0)
+              NewPhotosNotice(
+                count: state.newPhotosAnalyzed,
+                // The review of the tags has no screen yet: for now it only
+                // closes the notice.
+                onReview: () => context.read<MemoriesBloc>().add(
+                  NewPhotosNoticeDismissed(),
+                ),
+                onDismiss: () => context.read<MemoriesBloc>().add(
+                  NewPhotosNoticeDismissed(),
+                ),
+              ),
             Expanded(
               child: state.hasPhotos
                   ? const _PhotosPlaceholder()

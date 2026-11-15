@@ -16,3 +16,12 @@ class PhotoAnalysisRetried extends PhotoAnalysisEvent {
     return 'PhotoAnalysisRetried()';
   }
 }
+
+/// The person pressed «Reintentar» to analyze again only the photos
+/// «No analizada» (HU-10, CA8).
+class PhotoAnalysisFailedPhotosRetried extends PhotoAnalysisEvent {
+  @override
+  String toString() {
+    return 'PhotoAnalysisFailedPhotosRetried()';
+  }
+}

@@ -204,6 +204,52 @@ void main() {
       },
     );
 
+    testWidgets('with photos «No analizada» it waits on «Reintentar» '
+        '(HU-10, CA8)', (tester) async {
+      fakes.gallery.photos = devicePhotos(3);
+      fakes.analysis.blocked.add('p1');
+
+      await pumpAnalyzing(tester);
+      await tester.pump(const Duration(seconds: 2));
+      await settle(tester);
+
+      // It does not leave by itself: the person decides.
+      expect(find.byType(AnalyzingScreen), findsOneWidget);
+      expect(find.text('1 foto no analizada'), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+      expect(find.text('Ver mis recuerdos'), findsOneWidget);
+
+      fakes.analysis.blocked.clear();
+      fakes.analysis.calls.clear();
+      await tester.tap(find.text('Reintentar'));
+      await settle(tester);
+
+      expect(fakes.analysis.calls, [
+        ['p1'],
+      ]);
+      expect(find.text('Analizadas 3 de 3 fotos'), findsOneWidget);
+      expect(find.text('1 foto no analizada'), findsNothing);
+
+      // Now that every photo is analyzed, it opens Recuerdos by itself.
+      await tester.pump(const Duration(seconds: 2));
+      await settle(tester);
+      expect(find.text('Pantalla Recuerdos'), findsOneWidget);
+    });
+
+    testWidgets('«Ver mis recuerdos» leaves the failed photos for later', (
+      tester,
+    ) async {
+      fakes.gallery.photos = devicePhotos(2);
+      fakes.analysis.blocked.add('p0');
+
+      await pumpAnalyzing(tester);
+      await tester.tap(find.text('Ver mis recuerdos'));
+      await settle(tester);
+
+      expect(find.text('Pantalla Recuerdos'), findsOneWidget);
+      expect(fakes.analysis.retryFailedCalls, 0);
+    });
+
     testWidgets('at 100 % it opens Recuerdos by itself', (tester) async {
       fakes.gallery.photos = devicePhotos(3);
 

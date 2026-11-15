@@ -3,6 +3,7 @@ import 'package:memorylens/features/connectivity/domain/usecases/watch_connectiv
 import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
 import 'package:memorylens/features/photo_analysis/domain/entities/analysis_progress.dart';
 import 'package:memorylens/features/photo_analysis/domain/usecases/analyze_pending_photos_usecase.dart';
+import 'package:memorylens/features/photo_analysis/domain/usecases/retry_failed_photos_usecase.dart';
 import 'package:memorylens/features/photo_analysis/ui/bloc/photo_analysis_event.dart';
 import 'package:memorylens/features/photo_analysis/ui/bloc/photo_analysis_state.dart';
 import 'package:memorylens/injection_container.dart';
@@ -16,6 +17,7 @@ class PhotoAnalysisBloc extends Bloc<PhotoAnalysisEvent, PhotoAnalysisState> {
   static const maxAttemptsWithoutProgress = 5;
 
   final AnalyzePendingPhotosUseCase _analyze = sl();
+  final RetryFailedPhotosUseCase _retryFailed = sl();
   final WatchConnectivityUseCase _watch = sl();
 
   /// Pause between the connection coming back and the next run.
@@ -25,6 +27,31 @@ class PhotoAnalysisBloc extends Bloc<PhotoAnalysisEvent, PhotoAnalysisState> {
     : super(const PhotoAnalysisState()) {
     on<PhotoAnalysisStarted>(_onRequested);
     on<PhotoAnalysisRetried>(_onRequested);
+    on<PhotoAnalysisFailedPhotosRetried>(_onFailedPhotosRetried);
+  }
+
+  /// HU-10, CA8: once the analysis ended, the photos «No analizada» go back
+  /// to the queue and only they are sent again.
+  Future<void> _onFailedPhotosRetried(
+    PhotoAnalysisFailedPhotosRetried event,
+    Emitter<PhotoAnalysisState> emit,
+  ) async {
+    // Only when nothing runs, and before the first await, like a start.
+    if (state.status != PhotoAnalysisStatus.completed &&
+        state.status != PhotoAnalysisStatus.failure) {
+      return;
+    }
+    emit(state.copyWith(status: PhotoAnalysisStatus.analyzing));
+    try {
+      await _retryFailed();
+    } catch (e, stack) {
+      if (emit.isDone) return;
+      addError(e, stack);
+      emit(_failed(e));
+      return;
+    }
+    if (emit.isDone) return;
+    await _analyzeUntilDone(emit);
   }
 
   Future<void> _onRequested(
@@ -39,7 +66,12 @@ class PhotoAnalysisBloc extends Bloc<PhotoAnalysisEvent, PhotoAnalysisState> {
       return;
     }
     emit(state.copyWith(status: PhotoAnalysisStatus.analyzing));
+    await _analyzeUntilDone(emit);
+  }
 
+  /// Runs the analysis until no photo is left waiting, going on by itself
+  /// after a connection drop. The status is already analyzing.
+  Future<void> _analyzeUntilDone(Emitter<PhotoAnalysisState> emit) async {
     var attemptsWithoutProgress = 0;
     while (!emit.isDone) {
       final doneBefore = state.analyzed + state.failed;

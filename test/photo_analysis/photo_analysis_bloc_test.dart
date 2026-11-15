@@ -89,6 +89,78 @@ void main() {
     expect(state.analyzed, 2);
   });
 
+  test('«Reintentar» sends again only the photos «No analizada» '
+      '(HU-10, CA8)', () async {
+    imported(3);
+    fakes.analysis.blocked.add('p1');
+
+    bloc.add(PhotoAnalysisStarted());
+    final first = await until(PhotoAnalysisStatus.completed);
+    expect(first.failed, 1);
+
+    fakes.analysis.blocked.clear();
+    fakes.analysis.calls.clear();
+    final next = bloc.stream
+        .skipWhile((s) => s.status != PhotoAnalysisStatus.analyzing)
+        .firstWhere((s) => s.status == PhotoAnalysisStatus.completed);
+    bloc.add(PhotoAnalysisFailedPhotosRetried());
+    final state = await next.timeout(const Duration(seconds: 5));
+
+    expect(fakes.analysis.retryFailedCalls, 1);
+    expect(fakes.analysis.calls, [
+      ['p1'],
+    ]);
+    expect(state.analyzed, 3);
+    expect(state.failed, 0);
+  });
+
+  test('a photo that fails again is «No analizada» again', () async {
+    imported(2);
+    fakes.analysis.blocked.add('p0');
+    bloc.add(PhotoAnalysisStarted());
+    await until(PhotoAnalysisStatus.completed);
+
+    final next = bloc.stream
+        .skipWhile((s) => s.status != PhotoAnalysisStatus.analyzing)
+        .firstWhere((s) => s.status == PhotoAnalysisStatus.completed);
+    bloc.add(PhotoAnalysisFailedPhotosRetried());
+    final state = await next.timeout(const Duration(seconds: 5));
+
+    // It had its 3 attempts again.
+    expect(fakes.analysis.calls.where((c) => c.contains('p0')), hasLength(6));
+    expect(state.analyzed, 1);
+    expect(state.failed, 1);
+  });
+
+  test('retrying the failed photos while it works does nothing', () async {
+    imported(2);
+
+    bloc
+      ..add(PhotoAnalysisStarted())
+      ..add(PhotoAnalysisFailedPhotosRetried());
+    await until(PhotoAnalysisStatus.completed);
+
+    expect(fakes.analysis.retryFailedCalls, 0);
+    expect(fakes.analysis.calls, hasLength(1));
+  });
+
+  test('if the failed photos cannot be put back, it says why', () async {
+    imported(2);
+    fakes.analysis.blocked.add('p0');
+    bloc.add(PhotoAnalysisStarted());
+    await until(PhotoAnalysisStatus.completed);
+
+    fakes.analysis.retryFailedError = const AppException(
+      'Tuvimos un problema de nuestro lado.',
+      kind: AppErrorKind.server,
+    );
+    bloc.add(PhotoAnalysisFailedPhotosRetried());
+    final state = await until(PhotoAnalysisStatus.failure);
+
+    expect(state.errorMessage, 'Tuvimos un problema de nuestro lado.');
+    expect(state.failed, 1);
+  });
+
   test('another failure shows its message and «Reintentar» recovers', () async {
     imported(2);
     fakes.analysis.backlogError = const AppException(

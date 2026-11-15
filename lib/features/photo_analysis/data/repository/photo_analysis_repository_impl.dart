@@ -22,6 +22,20 @@ class PhotoAnalysisRepositoryImpl implements PhotoAnalysisRepository {
   }
 
   @override
+  Future<({int analyzed, int failed})> doneCounts() async {
+    final results = await Future.wait([
+      _dataSource.countInState('listo'),
+      _dataSource.countInState('error'),
+    ]);
+    return (analyzed: results[0], failed: results[1]);
+  }
+
+  @override
+  Future<int> retryFailed() {
+    return _dataSource.retryFailed();
+  }
+
+  @override
   Future<bool> hasPendingAnalysis() async {
     return await _dataSource.countInState('pendiente') > 0;
   }

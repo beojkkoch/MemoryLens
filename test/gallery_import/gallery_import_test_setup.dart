@@ -7,13 +7,16 @@ import 'package:memorylens/features/gallery_import/domain/entities/device_galler
 import 'package:memorylens/features/gallery_import/domain/repository/device_gallery_repository.dart';
 import 'package:memorylens/features/gallery_import/domain/repository/import_scan_repository.dart';
 import 'package:memorylens/features/gallery_import/domain/repository/photo_import_repository.dart';
+import 'package:memorylens/features/gallery_import/domain/usecases/count_new_photos_usecase.dart';
 import 'package:memorylens/features/gallery_import/domain/usecases/has_pending_import_usecase.dart';
+import 'package:memorylens/features/gallery_import/domain/usecases/import_new_photos_usecase.dart';
 import 'package:memorylens/features/gallery_import/domain/usecases/import_gallery_photos_usecase.dart';
 import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_bloc.dart';
 import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_event.dart';
 import 'package:memorylens/features/photo_analysis/domain/repository/photo_analysis_repository.dart';
 import 'package:memorylens/features/photo_analysis/domain/usecases/analyze_pending_photos_usecase.dart';
 import 'package:memorylens/features/photo_analysis/domain/usecases/has_pending_analysis_usecase.dart';
+import 'package:memorylens/features/photo_analysis/domain/usecases/retry_failed_photos_usecase.dart';
 import 'package:memorylens/features/photo_analysis/ui/bloc/photo_analysis_bloc.dart';
 import 'package:memorylens/injection_container.dart';
 
@@ -67,6 +70,11 @@ GalleryImportFakes registerGalleryImportFakes() {
     ),
   );
   sl.registerLazySingleton(() => HasPendingAnalysisUseCase());
+  sl.registerLazySingleton(() => RetryFailedPhotosUseCase());
+  // HU-11. They also need a GalleryPermissionRepository, which each test
+  // registers.
+  sl.registerLazySingleton(() => CountNewPhotosUseCase());
+  sl.registerLazySingleton(() => ImportNewPhotosUseCase());
   return fakes;
 }
 

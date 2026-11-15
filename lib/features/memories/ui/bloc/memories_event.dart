@@ -48,3 +48,12 @@ class MemoriesResumed extends MemoriesEvent {
     return 'MemoriesResumed()';
   }
 }
+
+/// The person closed «N nuevas fotos analizadas» or pressed «Revisar
+/// etiquetas».
+class NewPhotosNoticeDismissed extends MemoriesEvent {
+  @override
+  String toString() {
+    return 'NewPhotosNoticeDismissed()';
+  }
+}

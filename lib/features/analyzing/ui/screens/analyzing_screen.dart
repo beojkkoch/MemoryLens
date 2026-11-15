@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:memorylens/components/error_retry_view.dart';
 import 'package:memorylens/components/memory_lens_app_bar.dart';
+import 'package:memorylens/components/primary_button.dart';
 import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_bloc.dart';
 import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_event.dart';
 import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_state.dart';
@@ -19,7 +20,9 @@ import 'package:memorylens/theme/app_theme.dart';
 ///
 /// The ring and the numbers come from the photos really processed (HU-10):
 /// they change every time a call to the AI ends, and after a restart they
-/// start from what is saved. At 100 % it opens Recuerdos by itself.
+/// start from what is saved. At 100 % it opens Recuerdos by itself, unless
+/// some photo could not be analyzed: then it waits on «Reintentar», which
+/// sends only those photos again, or «Ver mis recuerdos».
 class AnalyzingScreen extends StatefulWidget {
   /// How long 100 % stays on screen before Recuerdos opens, so the person
   /// sees that it finished and how many photos failed.
@@ -61,7 +64,8 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
           BlocListener<PhotoAnalysisBloc, PhotoAnalysisState>(
             listenWhen: (previous, current) =>
                 previous.status != current.status &&
-                current.status == PhotoAnalysisStatus.completed,
+                current.status == PhotoAnalysisStatus.completed &&
+                current.failed == 0,
             listener: (context, _) => _openRecuerdosSoon(),
           ),
         ],
@@ -130,6 +134,7 @@ class _AnalysisView extends StatelessWidget {
         }
         final waiting = state.status == PhotoAnalysisStatus.waitingConnection;
         final completed = state.status == PhotoAnalysisStatus.completed;
+        final canRetryFailed = completed && state.failed > 0;
         return _Progress(
           known: completed || state.total > 0,
           done: state.analyzed + state.failed,
@@ -143,9 +148,38 @@ class _AnalysisView extends StatelessWidget {
           failed: state.failed,
           detail: waiting
               ? 'Seguiremos donde quedamos en cuanto vuelva internet.'
+              : canRetryFailed
+              ? 'Puedes intentarlo otra vez solo con las fotos que fallaron.'
               : 'Le ponemos a cada foto un título, una categoría y etiquetas.',
+          actions: canRetryFailed ? const _RetryFailedActions() : null,
         );
       },
+    );
+  }
+}
+
+/// HU-10, CA8: analyze again only the photos «No analizada», or move on.
+class _RetryFailedActions extends StatelessWidget {
+  const _RetryFailedActions();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        PrimaryButton(
+          label: 'Reintentar',
+          onPressed: () => context.read<PhotoAnalysisBloc>().add(
+            PhotoAnalysisFailedPhotosRetried(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+          onPressed: () =>
+              Navigator.pushReplacementNamed(context, '/recuerdos'),
+          child: const Text('Ver mis recuerdos'),
+        ),
+      ],
     );
   }
 }
@@ -165,6 +199,9 @@ class _Progress extends StatelessWidget {
   /// Photos «No analizada» (HU-10, CA7).
   final int failed;
 
+  /// Buttons under the numbers, if any.
+  final Widget? actions;
+
   const _Progress({
     required this.known,
     required this.done,
@@ -173,6 +210,7 @@ class _Progress extends StatelessWidget {
     required this.count,
     required this.detail,
     this.failed = 0,
+    this.actions,
   });
 
   @override
@@ -254,6 +292,7 @@ class _Progress extends StatelessWidget {
                 color: AppColors.textSecondary,
               ),
             ),
+            if (actions != null) ...[const SizedBox(height: 24), actions!],
           ],
         ),
       ),

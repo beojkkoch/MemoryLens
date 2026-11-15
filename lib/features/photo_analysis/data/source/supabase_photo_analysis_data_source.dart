@@ -95,6 +95,17 @@ class SupabasePhotoAnalysisDataSource {
     }
   }
 
+  /// Puts every «No analizada» photo back in the queue with its 3 attempts
+  /// (HU-10, CA8). Returns how many went back.
+  Future<int> retryFailed() async {
+    try {
+      final count = await _client.rpc('reintentar_fotos_no_analizadas');
+      return count is num ? count.toInt() : 0;
+    } catch (e, stack) {
+      Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
+    }
+  }
+
   /// Reads `{"resultados": [{"foto_id": "...", "estado": "listo"}]}`.
   static Map<String, PhotoAnalysisOutcome> parseResults(Object? data) {
     final results = <String, PhotoAnalysisOutcome>{};
