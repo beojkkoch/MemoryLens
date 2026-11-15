@@ -7,9 +7,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class SupabasePhotoDataSource {
   static const bucket = 'fotos';
 
-  /// The most rows the server gives in one answer.
-  static const pageSize = 1000;
-
   /// How long the links of the private bucket work. Opening Recuerdos again
   /// signs new ones.
   static const signedUrlLifetime = Duration(hours: 24);
@@ -26,24 +23,36 @@ class SupabasePhotoDataSource {
     }
   }
 
-  /// The photos the AI already described, newest first, with signed links to
-  /// the image and its thumbnail.
-  Future<List<MemoryPhoto>> analyzed() async {
+  /// How many photos the AI already described, for «128 fotos».
+  Future<int> countAnalyzed() async {
     try {
-      final photos = <MemoryPhoto>[];
-      var from = 0;
-      while (true) {
-        final rows = await _client
-            .from('foto')
-            .select('id, titulo, fecha_captura, url_imagen, ruta_miniatura')
-            .eq('estado_analisis', 'listo')
-            .order('fecha_captura', ascending: false, nullsFirst: false)
-            .order('id')
-            .range(from, from + pageSize - 1);
-        photos.addAll(await _withLinks(rows));
-        if (rows.length < pageSize) return photos;
-        from += pageSize;
-      }
+      final response = await _client
+          .from('foto')
+          .select('id')
+          .eq('estado_analisis', 'listo')
+          .count(CountOption.exact);
+      return response.count;
+    } catch (e, stack) {
+      Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
+    }
+  }
+
+  /// One page of the photos the AI already described, newest first, with
+  /// signed links to the image and its thumbnail (HU-15). Only the photos of
+  /// the page are signed.
+  Future<List<MemoryPhoto>> analyzed({
+    required int offset,
+    required int limit,
+  }) async {
+    try {
+      final rows = await _client
+          .from('foto')
+          .select('id, titulo, fecha_captura, url_imagen, ruta_miniatura')
+          .eq('estado_analisis', 'listo')
+          .order('fecha_captura', ascending: false, nullsFirst: false)
+          .order('id')
+          .range(offset, offset + limit - 1);
+      return await _withLinks(rows);
     } catch (e, stack) {
       Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
     }
