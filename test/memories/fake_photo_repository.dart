@@ -15,6 +15,13 @@ class FakePhotoRepository implements PhotoRepository {
   /// account after an analysis.
   final List<List<MemoryPhoto>> laterAnalyzed = [];
 
+  /// Ids of the photos of [analyzedPhotos] the AI described during the last
+  /// analysis, served by [analyzedSince].
+  final Set<String> recentIds = {};
+
+  /// The `takenAfter` of every call to [analyzedSince].
+  final List<DateTime?> sinceTakenAfter = [];
+
   /// Thrown by every method when set.
   Object? error;
 
@@ -57,6 +64,22 @@ class FakePhotoRepository implements PhotoRepository {
       if (nextPageError != null) throw nextPageError!;
     }
     return analyzedPhotos.skip(offset).take(limit).toList();
+  }
+
+  @override
+  Future<List<MemoryPhoto>> analyzedSince({
+    required DateTime since,
+    DateTime? takenAfter,
+  }) async {
+    sinceTakenAfter.add(takenAfter);
+    if (error != null) throw error!;
+    return [
+      for (final photo in analyzedPhotos)
+        if (recentIds.contains(photo.id) &&
+            (takenAfter == null ||
+                (photo.takenAt != null && photo.takenAt!.isAfter(takenAfter))))
+          photo,
+    ];
   }
 }
 

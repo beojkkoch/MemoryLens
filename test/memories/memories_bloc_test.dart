@@ -398,6 +398,7 @@ void main() {
           memoryPhoto('p1'),
           memoryPhoto('p2'),
         ]);
+        photos.recentIds.add('p2');
 
         bloc.add(MemoriesStarted());
         final state = await until((s) => s.newPhotosAnalyzed > 0);

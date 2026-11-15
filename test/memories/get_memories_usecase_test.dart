@@ -77,20 +77,86 @@ void main() {
       expect(ids, contains('p${pageSize - 1}'));
     });
 
-    test('after an analysis the newest page comes back on top and the rest '
-        'stays loaded', () async {
-      photos.analyzedPhotos = manyPhotos(300);
-      final loaded = await getMemories.next(await getMemories());
-      photos.analyzedPhotos = [
-        memoryPhoto('new', takenAt: DateTime(2025)),
-        ...manyPhotos(300),
-      ];
+    group('after an analysis', () {
+      final since = DateTime(2026, 11, 15, 10);
 
-      final refreshed = await getMemories.refresh(loaded);
+      test('a new photo taken today goes on top and nothing loaded is '
+          'dropped', () async {
+        photos.analyzedPhotos = manyPhotos(300);
+        final loaded = await getMemories.next(await getMemories());
+        photos.analyzedPhotos = [
+          memoryPhoto('new', takenAt: DateTime(2025)),
+          ...manyPhotos(300),
+        ];
+        photos.recentIds.add('new');
 
-      expect(refreshed.photos, hasLength(2 * pageSize + 1));
-      expect(refreshed.groups.first.photos.first.id, 'new');
-      expect(refreshed.hasMore, isTrue);
+        final refreshed = await getMemories.refresh(loaded, since: since);
+
+        expect(refreshed.photos, hasLength(2 * pageSize + 1));
+        expect(refreshed.groups.first.photos.first.id, 'new');
+        expect(refreshed.hasMore, isTrue);
+      });
+
+      test('a new photo taken long ago goes under its own day', () async {
+        photos.analyzedPhotos = manyPhotos(300);
+        final loaded = await getMemories.next(await getMemories());
+        // Taken between two photos already loaded: p10 and p11.
+        final old = memoryPhoto(
+          'old',
+          takenAt: DateTime(2024, 6, 15).subtract(const Duration(minutes: 630)),
+        );
+        photos.analyzedPhotos = [
+          ...manyPhotos(300).take(11),
+          old,
+          ...manyPhotos(300).skip(11),
+        ];
+        photos.recentIds.add('old');
+
+        final refreshed = await getMemories.refresh(loaded, since: since);
+        final ids = [
+          for (final group in refreshed.groups)
+            for (final photo in group.photos) photo.id,
+        ];
+        expect(ids.sublist(10, 13), ['p10', 'old', 'p11']);
+
+        // The next page goes on right after the last loaded one: none is
+        // skipped and none repeats.
+        final next = await getMemories.next(refreshed);
+        final nextIds = next.photos.map((p) => p.id).toList();
+        expect(nextIds.toSet(), hasLength(nextIds.length));
+        expect(nextIds, hasLength(3 * pageSize + 1));
+        expect(nextIds, contains('p${2 * pageSize}'));
+      });
+
+      test(
+        'one taken before the oldest loaded is left for the next pages',
+        () async {
+          photos.analyzedPhotos = manyPhotos(300);
+          final loaded = await getMemories();
+
+          await getMemories.refresh(loaded, since: since);
+
+          expect(photos.sinceTakenAfter, [
+            loaded.groups.last.photos.last.takenAt,
+          ]);
+        },
+      );
+
+      test('with everything loaded any new photo comes in', () async {
+        photos.analyzedPhotos = manyPhotos(3);
+        final loaded = await getMemories();
+        photos.analyzedPhotos = [
+          ...manyPhotos(3),
+          memoryPhoto('older', takenAt: DateTime(2020)),
+        ];
+        photos.recentIds.add('older');
+
+        final refreshed = await getMemories.refresh(loaded, since: since);
+
+        expect(photos.sinceTakenAfter, [null]);
+        expect(refreshed.groups.last.photos.single.id, 'older');
+        expect(refreshed.hasMore, isFalse);
+      });
     });
   });
 }

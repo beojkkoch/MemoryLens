@@ -437,6 +437,7 @@ void main() {
         memoryPhoto('p0', takenAt: DateTime(2024, 6, 15)),
         memoryPhoto('p1', takenAt: DateTime(2024, 6, 16)),
       ]);
+      photos.recentIds.add('p1');
 
       await pumpMemories(tester);
       await settle(tester);
