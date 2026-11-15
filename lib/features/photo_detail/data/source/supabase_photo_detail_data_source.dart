@@ -1,9 +1,11 @@
 import 'package:memorylens/features/error_handling/data/mapper/exception_mapper.dart';
 import 'package:memorylens/features/photo_analysis/domain/entities/money.dart';
 import 'package:memorylens/features/photo_detail/domain/entities/photo_detail.dart';
+import 'package:memorylens/features/photo_detail/domain/entities/photo_edit.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// The only file that reads one photo with its analysis for the detail.
+/// The only file that reads one photo with its analysis for the detail and
+/// saves the corrections of the person.
 class SupabasePhotoDetailDataSource {
   static const bucket = 'fotos';
 
@@ -38,6 +40,36 @@ class SupabasePhotoDetailDataSource {
     } catch (e, stack) {
       Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
     }
+  }
+
+  /// In the order of the catalog.
+  Future<List<String>> categories() async {
+    try {
+      final rows = await _client.from('categoria').select('nombre').order('id');
+      return [for (final row in rows) row['nombre'] as String];
+    } catch (e, stack) {
+      Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
+    }
+  }
+
+  /// guardar_correccion_foto checks the data again, updates the tags and
+  /// clears the purchase data outside «Factura».
+  Future<void> save(String id, PhotoEdit edit) async {
+    try {
+      await _client.rpc('guardar_correccion_foto', params: paramsFor(id, edit));
+    } catch (e, stack) {
+      Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
+    }
+  }
+
+  static Map<String, dynamic> paramsFor(String id, PhotoEdit edit) {
+    return {
+      'p_foto_id': id,
+      'p_categoria': edit.category,
+      'p_tipo_compra': edit.purchaseType,
+      'p_monto': edit.total?.amount,
+      'p_moneda': edit.total?.currency,
+    };
   }
 
   /// A missing file is not a missing photo: the data still shows, with a

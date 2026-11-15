@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:memorylens/components/error_retry_view.dart';
 import 'package:memorylens/components/primary_button.dart';
 import 'package:memorylens/features/photo_detail/domain/entities/photo_detail.dart';
+import 'package:memorylens/features/photo_detail/domain/entities/photo_edit.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_bloc.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_event.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_state.dart';
@@ -11,8 +12,9 @@ import 'package:memorylens/features/photo_detail/ui/widgets/photo_analysis_panel
 import 'package:memorylens/theme/app_theme.dart';
 
 /// A photo in large with its AI analysis and the data found in it (HU-28).
-/// Opened from Recuerdos or the chat with the id of the photo. Needs a
-/// PhotoDetailBloc above it.
+/// Opened from Recuerdos or the chat with the id of the photo. «Hecho» saves
+/// the corrections and opens the home (HU-30). Needs a PhotoDetailBloc above
+/// it.
 class PhotoDetailScreen extends StatelessWidget {
   final String photoId;
 
@@ -22,7 +24,11 @@ class PhotoDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: BlocBuilder<PhotoDetailBloc, PhotoDetailState>(
+      body: BlocConsumer<PhotoDetailBloc, PhotoDetailState>(
+        listenWhen: (previous, current) =>
+            previous.saveStatus != current.saveStatus &&
+            current.saveStatus == PhotoSaveStatus.saved,
+        listener: (context, _) => _openHome(context),
         builder: (context, state) {
           switch (state.status) {
             case PhotoDetailStatus.loading:
@@ -41,33 +47,66 @@ class PhotoDetailScreen extends StatelessWidget {
             case PhotoDetailStatus.notFound:
               return const _NotFound();
             case PhotoDetailStatus.ready:
-              return _WithBackButton(child: _Detail(detail: state.detail!));
+              return _WithBackButton(
+                child: _Detail(
+                  state: state,
+                  onDone: (edit) => context.read<PhotoDetailBloc>().add(
+                    PhotoEditSubmitted(photoId, edit),
+                  ),
+                ),
+              );
           }
         },
       ),
     );
   }
+
+  /// Back to Recuerdos, which may be under the chat. If it is not in the
+  /// stack at all, it replaces whatever is first.
+  static void _openHome(BuildContext context) {
+    final navigator = Navigator.of(context);
+    var home = false;
+    navigator.popUntil((route) {
+      home = route.settings.name == homeRoute;
+      return home || route.isFirst;
+    });
+    if (!home) navigator.pushReplacementNamed(homeRoute);
+  }
+
+  static const homeRoute = '/recuerdos';
 }
 
 /// The photo on top, about 70 % of the screen (CA1), and the panel below.
+///
+/// Not a lazy list: the panel must never be thrown away while scrolling, or
+/// what the person typed would be lost.
 class _Detail extends StatelessWidget {
-  final PhotoDetail detail;
+  final PhotoDetailState state;
+  final ValueChanged<PhotoEdit> onDone;
 
-  const _Detail({required this.detail});
+  const _Detail({required this.state, required this.onDone});
 
   @override
   Widget build(BuildContext context) {
+    final detail = state.detail!;
     return LayoutBuilder(
       builder: (context, constraints) {
-        return ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            SizedBox(
-              height: constraints.maxHeight * 0.7,
-              child: _LargePhoto(detail: detail),
-            ),
-            PhotoAnalysisPanel(detail: detail),
-          ],
+        return SingleChildScrollView(
+          child: Column(
+            children: [
+              SizedBox(
+                height: constraints.maxHeight * 0.7,
+                child: _LargePhoto(detail: detail),
+              ),
+              PhotoAnalysisPanel(
+                detail: detail,
+                categories: state.categories,
+                saving: state.saveStatus == PhotoSaveStatus.saving,
+                saveError: state.saveError,
+                onDone: onDone,
+              ),
+            ],
+          ),
         );
       },
     );

@@ -40,6 +40,12 @@ class Money {
     return '${amount < 0 ? '-' : ''}${style.symbol}$number';
   }
 
+  /// The symbol written before the amount, like `$` or `€`; the code for a
+  /// currency with no style.
+  static String symbolFor(String currency) {
+    return _styles[currency]?.symbol ?? currency;
+  }
+
   @override
   bool operator ==(Object other) =>
       other is Money && other.amount == amount && other.currency == currency;
