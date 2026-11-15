@@ -7,6 +7,8 @@ import 'package:memorylens/features/gallery_access/domain/usecases/request_galle
 import 'package:memorylens/features/gallery_import/domain/usecases/count_new_photos_usecase.dart';
 import 'package:memorylens/features/gallery_import/domain/usecases/has_pending_import_usecase.dart';
 import 'package:memorylens/features/gallery_import/domain/usecases/import_new_photos_usecase.dart';
+import 'package:memorylens/features/memories/domain/entities/memory_timeline.dart';
+import 'package:memorylens/features/memories/domain/usecases/count_analyzed_photos_usecase.dart';
 import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
 import 'package:memorylens/features/memories/domain/usecases/get_memories_usecase.dart';
 import 'package:memorylens/features/photo_analysis/domain/usecases/has_pending_analysis_usecase.dart';
@@ -26,6 +28,7 @@ import 'package:memorylens/injection_container.dart';
 class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
   final CountPhotosUseCase _countPhotos = sl();
   final GetMemoriesUseCase _getMemories = sl();
+  final CountAnalyzedPhotosUseCase _countAnalyzed = sl();
   final RequestGalleryAccessUseCase _requestAccess = sl();
   final CheckGalleryAccessUseCase _checkAccess = sl();
   final OpenGallerySettingsUseCase _openSettings = sl();
@@ -46,6 +49,7 @@ class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
     on<GallerySettingsRequested>(_onSettingsRequested);
     on<MemoriesResumed>(_onResumed);
     on<NewPhotosNoticeDismissed>(_onNoticeDismissed);
+    on<MoreMemoriesRequested>(_onMoreRequested);
   }
 
   Future<void> _onStarted(
@@ -54,13 +58,19 @@ class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
   ) async {
     emit(state.copyWith(status: MemoriesStatus.loading));
     try {
-      final count = await _countPhotos();
-      final groups = await _getMemories();
+      // At the same time, so the first page shows fast (HU-15, CA5).
+      final results = await Future.wait<Object>([
+        _countPhotos(),
+        _countAnalyzed(),
+        _getMemories(),
+      ]);
       emit(
         state.copyWith(
           status: MemoriesStatus.ready,
-          photoCount: count,
-          groups: groups,
+          photoCount: results[0] as int,
+          analyzedCount: results[1] as int,
+          timeline: results[2] as MemoryTimeline,
+          loadingMore: false,
         ),
       );
     } catch (e, stack) {
@@ -96,12 +106,14 @@ class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
       final analyzed = await _importNewPhotos();
       final count = await _countPhotos();
       // The timeline and its total follow the analysis (HU-12, CA6).
-      final groups = await _getMemories();
+      final analyzedCount = await _countAnalyzed();
+      final timeline = await _getMemories.refresh(state.timeline);
       if (emit.isDone) return;
       emit(
         state.copyWith(
           photoCount: count,
-          groups: groups,
+          analyzedCount: analyzedCount,
+          timeline: timeline,
           newPhotos: 0,
           newPhotosAnalyzed: state.newPhotosAnalyzed + analyzed,
           errorMessage: state.errorMessage,
@@ -116,6 +128,35 @@ class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
       }
     } finally {
       _lookingForNewPhotos = false;
+    }
+  }
+
+  /// HU-15: the next page of the timeline, one at a time. A failure only
+  /// stops the indicator: the next scroll tries again.
+  Future<void> _onMoreRequested(
+    MoreMemoriesRequested event,
+    Emitter<MemoriesState> emit,
+  ) async {
+    if (state.status != MemoriesStatus.ready ||
+        state.loadingMore ||
+        !state.timeline.hasMore) {
+      return;
+    }
+    emit(state.copyWith(loadingMore: true, errorMessage: state.errorMessage));
+    try {
+      final timeline = await _getMemories.next(state.timeline);
+      emit(
+        state.copyWith(
+          timeline: timeline,
+          loadingMore: false,
+          errorMessage: state.errorMessage,
+        ),
+      );
+    } catch (e, stack) {
+      if (!_isConnectionProblem(e)) addError(e, stack);
+      emit(
+        state.copyWith(loadingMore: false, errorMessage: state.errorMessage),
+      );
     }
   }
 

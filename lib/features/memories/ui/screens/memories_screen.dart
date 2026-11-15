@@ -140,6 +140,10 @@ class _MemoriesScreenState extends State<MemoriesScreen>
                   ? _EmptyBody(state: state)
                   : MemoriesGrid(
                       groups: state.groups,
+                      loadingMore: state.loadingMore,
+                      onNearEnd: () => context.read<MemoriesBloc>().add(
+                        MoreMemoriesRequested(),
+                      ),
                       // Pushed on top, so Recuerdos and its scroll stay
                       // below (CA7).
                       onOpen: (photo) => Navigator.pushNamed(

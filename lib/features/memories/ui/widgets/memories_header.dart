@@ -33,14 +33,19 @@ class MemoriesHeader extends StatelessWidget {
             color: connected ? AppColors.primary : AppColors.textSecondary,
           ),
           const SizedBox(width: 8),
-          Text(
-            connected ? 'Galería conectada' : 'Sin conectar',
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
+          // Gives way to the count, which can be long with thousands of
+          // photos.
+          Expanded(
+            child: Text(
+              connected ? 'Galería conectada' : 'Sin conectar',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(

@@ -1,4 +1,5 @@
 import 'package:memorylens/features/memories/domain/entities/memory_group.dart';
+import 'package:memorylens/features/memories/domain/entities/memory_timeline.dart';
 
 /// How the load of the photo count went.
 enum MemoriesStatus { loading, ready, failure }
@@ -39,8 +40,16 @@ class MemoriesState {
   /// hides the notice.
   final int newPhotosAnalyzed;
 
-  /// The analyzed photos, grouped by the day they were taken (HU-12).
-  final List<MemoryGroup> groups;
+  /// The analyzed photos loaded so far, grouped by the day they were taken
+  /// (HU-12, HU-15).
+  final MemoryTimeline timeline;
+
+  /// Every analyzed photo of the account, loaded or not, for «128 fotos»
+  /// (HU-12, CA6).
+  final int analyzedCount;
+
+  /// The next page of the timeline is on its way (HU-15, CA3).
+  final bool loadingMore;
 
   const MemoriesState({
     this.status = MemoriesStatus.loading,
@@ -49,15 +58,14 @@ class MemoriesState {
     this.errorMessage,
     this.newPhotos = 0,
     this.newPhotosAnalyzed = 0,
-    this.groups = const [],
+    this.timeline = MemoryTimeline.empty,
+    this.analyzedCount = 0,
+    this.loadingMore = false,
   });
 
   bool get hasPhotos => photoCount > 0;
 
-  /// For «128 fotos» (HU-12, CA6).
-  int get analyzedCount {
-    return groups.fold(0, (total, group) => total + group.photos.length);
-  }
+  List<MemoryGroup> get groups => timeline.groups;
 
   /// When the newest photo was taken, for «Junio 2024» (HU-12, CA5).
   DateTime? get newestTakenAt {
@@ -72,7 +80,9 @@ class MemoriesState {
     String? errorMessage,
     int? newPhotos,
     int? newPhotosAnalyzed,
-    List<MemoryGroup>? groups,
+    MemoryTimeline? timeline,
+    int? analyzedCount,
+    bool? loadingMore,
   }) {
     return MemoriesState(
       status: status ?? this.status,
@@ -81,7 +91,9 @@ class MemoriesState {
       errorMessage: errorMessage,
       newPhotos: newPhotos ?? this.newPhotos,
       newPhotosAnalyzed: newPhotosAnalyzed ?? this.newPhotosAnalyzed,
-      groups: groups ?? this.groups,
+      timeline: timeline ?? this.timeline,
+      analyzedCount: analyzedCount ?? this.analyzedCount,
+      loadingMore: loadingMore ?? this.loadingMore,
     );
   }
 
@@ -90,6 +102,7 @@ class MemoriesState {
     return 'MemoriesState(status: ${status.name}, photos: $photoCount, '
         'access: ${access.name}, error: $errorMessage, '
         'newPhotos: $newPhotos, newPhotosAnalyzed: $newPhotosAnalyzed, '
-        'analyzed: $analyzedCount)';
+        'analyzed: $analyzedCount, timeline: $timeline, '
+        'loadingMore: $loadingMore)';
   }
 }
