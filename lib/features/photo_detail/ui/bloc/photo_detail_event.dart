@@ -1,3 +1,5 @@
+import 'package:memorylens/features/photo_detail/domain/entities/photo_edit.dart';
+
 /// Something the detail of a photo asks the PhotoDetailBloc to do.
 abstract class PhotoDetailEvent {}
 
@@ -10,5 +12,18 @@ class PhotoDetailRequested extends PhotoDetailEvent {
   @override
   String toString() {
     return 'PhotoDetailRequested($photoId)';
+  }
+}
+
+/// The person pressed «Hecho» (HU-30, CA7).
+class PhotoEditSubmitted extends PhotoDetailEvent {
+  final String photoId;
+  final PhotoEdit edit;
+
+  PhotoEditSubmitted(this.photoId, this.edit);
+
+  @override
+  String toString() {
+    return 'PhotoEditSubmitted($photoId, $edit)';
   }
 }

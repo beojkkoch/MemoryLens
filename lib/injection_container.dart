@@ -2,7 +2,9 @@ import 'package:get_it/get_it.dart';
 import 'package:memorylens/features/photo_detail/data/repository/photo_detail_repository_impl.dart';
 import 'package:memorylens/features/photo_detail/data/source/supabase_photo_detail_data_source.dart';
 import 'package:memorylens/features/photo_detail/domain/repository/photo_detail_repository.dart';
+import 'package:memorylens/features/photo_detail/domain/usecases/get_categories_usecase.dart';
 import 'package:memorylens/features/photo_detail/domain/usecases/get_photo_detail_usecase.dart';
+import 'package:memorylens/features/photo_detail/domain/usecases/save_photo_edit_usecase.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_bloc.dart';
 import 'package:memorylens/features/auth/data/repository/auth_repository_impl.dart';
 import 'package:memorylens/features/auth/data/repository/interest_repository_impl.dart';
@@ -136,6 +138,8 @@ void initDependencies() {
   sl.registerLazySingleton(() => CountNewPhotosUseCase());
   sl.registerLazySingleton(() => ImportNewPhotosUseCase());
   sl.registerLazySingleton(() => GetPhotoDetailUseCase());
+  sl.registerLazySingleton(() => GetCategoriesUseCase());
+  sl.registerLazySingleton(() => SavePhotoEditUseCase());
 
   //Observers
   sl.registerLazySingleton(() => ScreenTracker());
