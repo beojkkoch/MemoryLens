@@ -1,14 +1,18 @@
 import 'package:memorylens/features/photo_analysis/domain/entities/money.dart';
 import 'package:memorylens/features/photo_detail/domain/entities/photo_detail.dart';
 
-/// The data of a photo while the person corrects it, before saving
-/// (HU-29). The screen to edit it comes with its own story; this keeps the
-/// rule of which fields apply to each category.
+/// The data of a photo while the person corrects it in the detail, before
+/// pressing «Hecho» (HU-30). It keeps the rule of which fields apply to each
+/// category (HU-29).
 ///
 /// Changing the category only hides or shows the purchase fields: their
 /// values are kept, so going back to «Factura» before saving loses nothing.
 /// They are cleared only by [toSave] (CA3).
 class PhotoEdit {
+  /// For an amount typed in a photo that had none. The app is made for
+  /// Colombia first.
+  static const defaultCurrency = 'COP';
+
   final String? category;
   final String? purchaseType;
   final Money? total;
