@@ -9,11 +9,15 @@ import 'package:memorylens/features/gallery_access/domain/repository/gallery_per
 import 'package:memorylens/features/gallery_access/domain/usecases/check_gallery_access_usecase.dart';
 import 'package:memorylens/features/gallery_access/domain/usecases/open_gallery_settings_usecase.dart';
 import 'package:memorylens/features/gallery_access/domain/usecases/request_gallery_access_usecase.dart';
+import 'package:memorylens/features/memories/domain/entities/memory_photo.dart';
 import 'package:memorylens/features/memories/domain/repository/photo_repository.dart';
 import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
+import 'package:memorylens/features/memories/domain/usecases/get_memories_usecase.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
 import 'package:memorylens/features/memories/ui/screens/memories_screen.dart';
+import 'package:memorylens/features/memories/ui/widgets/memories_grid.dart';
+import 'package:memorylens/features/photo_detail/ui/screens/photo_detail_screen.dart';
 import 'package:memorylens/injection_container.dart';
 
 import '../gallery_access/fake_gallery_permission_repository.dart';
@@ -42,6 +46,7 @@ void main() {
     sl.registerLazySingleton(() => CheckGalleryAccessUseCase());
     sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
     sl.registerLazySingleton(() => CountPhotosUseCase());
+    sl.registerLazySingleton(() => GetMemoriesUseCase());
     sl.registerFactory(() => MemoriesBloc());
     // Analizando imports the photos, and Recuerdos asks if an import is
     // pending, so both need the import fakes.
@@ -61,6 +66,9 @@ void main() {
             child: const MemoriesScreen(),
           ),
           '/analizando': (_) => analyzingRoute(),
+          '/foto': (context) => PhotoDetailScreen(
+            photo: ModalRoute.of(context)!.settings.arguments as MemoryPhoto,
+          ),
         },
       ),
     );
@@ -118,6 +126,11 @@ void main() {
       tester,
     ) async {
       photos.photoCount = 3;
+      photos.analyzedPhotos = [
+        memoryPhoto('a', takenAt: DateTime(2024, 6, 15)),
+        memoryPhoto('b', takenAt: DateTime(2024, 6, 15)),
+        memoryPhoto('c', takenAt: DateTime(2024, 6, 14)),
+      ];
 
       await pumpMemories(tester);
 
@@ -336,6 +349,195 @@ void main() {
       expect(find.text(AppException.genericMessage), findsOneWidget);
       expect(find.textContaining('PlatformException'), findsNothing);
       expect(find.text(connectButton), findsOneWidget);
+    });
+  });
+
+  group('timeline (HU-12)', () {
+    /// A connected gallery whose analyzed photos are [analyzed].
+    void connectedWith(List<MemoryPhoto> analyzed) {
+      photos.photoCount = analyzed.length;
+      photos.analyzedPhotos = analyzed;
+    }
+
+    testWidgets('groups the photos under their day, newest first', (
+      tester,
+    ) async {
+      final now = DateTime.now();
+      connectedWith([
+        memoryPhoto('old', takenAt: DateTime(2024, 6, 15, 9)),
+        memoryPhoto('today', takenAt: now),
+        memoryPhoto(
+          'yesterday',
+          takenAt: now.subtract(const Duration(days: 1)),
+        ),
+      ]);
+
+      await pumpMemories(tester);
+
+      final today = tester.getTopLeft(find.text('Hoy')).dy;
+      final yesterday = tester.getTopLeft(find.text('Ayer')).dy;
+      final june = tester.getTopLeft(find.text('15 jun 2024')).dy;
+      expect(today, lessThan(yesterday));
+      expect(yesterday, lessThan(june));
+      expect(find.byType(MemoryTile), findsNWidgets(3));
+    });
+
+    testWidgets('a grid of 3 square columns (CA1)', (tester) async {
+      connectedWith([
+        for (var i = 0; i < 4; i++)
+          memoryPhoto('p$i', takenAt: DateTime(2024, 6, 15, 12 - i)),
+      ]);
+
+      await pumpMemories(tester);
+
+      final tiles = find.byType(MemoryTile);
+      final first = tester.getRect(tiles.at(0));
+      final third = tester.getRect(tiles.at(2));
+      final fourth = tester.getRect(tiles.at(3));
+      expect(first.width, closeTo(first.height, 0.01));
+      expect(third.top, first.top);
+      expect(fourth.top, greaterThan(first.bottom));
+    });
+
+    testWidgets(
+      'shows the month of the newest photo and the total (CA5, CA6)',
+      (tester) async {
+        connectedWith([
+          memoryPhoto('a', takenAt: DateTime(2024, 5, 2)),
+          memoryPhoto('b', takenAt: DateTime(2024, 6, 15)),
+        ]);
+
+        await pumpMemories(tester);
+
+        expect(find.text('Junio 2024'), findsOneWidget);
+        expect(find.text('2 fotos'), findsOneWidget);
+      },
+    );
+
+    testWidgets('one photo says «1 foto» (CA6)', (tester) async {
+      connectedWith([memoryPhoto('a', takenAt: DateTime(2024, 6, 15))]);
+
+      await pumpMemories(tester);
+
+      expect(find.text('1 foto'), findsOneWidget);
+    });
+
+    testWidgets('the total follows a finished analysis (CA6)', (tester) async {
+      connectedWith([memoryPhoto('p0', takenAt: DateTime(2024, 6, 15))]);
+      permission.checkResult = GalleryPermissionStatus.granted;
+      importFakes.gallery.photos = devicePhotos(2);
+      importFakes.photos.imported.add('p0');
+      importFakes.analysis.done['p0'] = PhotoAnalysisOutcome.analyzed;
+      // What the account has once the new photo is analyzed.
+      photos.laterAnalyzed.add([
+        memoryPhoto('p0', takenAt: DateTime(2024, 6, 15)),
+        memoryPhoto('p1', takenAt: DateTime(2024, 6, 16)),
+      ]);
+
+      await pumpMemories(tester);
+      await settle(tester);
+
+      expect(find.text('2 fotos'), findsOneWidget);
+      expect(find.byType(MemoryTile), findsNWidgets(2));
+    });
+
+    testWidgets('every thumbnail reads «Abrir [título]» (CA8)', (tester) async {
+      connectedWith([
+        memoryPhoto('a', title: 'Café en el parque', takenAt: DateTime(2024)),
+      ]);
+
+      await pumpMemories(tester);
+
+      expect(find.bySemanticsLabel('Abrir Café en el parque'), findsOneWidget);
+    });
+
+    testWidgets(
+      'a tap opens the photo and the way back keeps the scroll (CA7)',
+      (tester) async {
+        connectedWith([
+          for (var i = 0; i < 60; i++)
+            memoryPhoto(
+              'p$i',
+              title: 'Foto $i',
+              takenAt: DateTime(2024, 6, 1).subtract(Duration(days: i ~/ 3)),
+            ),
+        ]);
+        await pumpMemories(tester);
+
+        await tester.drag(find.byType(CustomScrollView), const Offset(0, -900));
+        await tester.pumpAndSettle();
+        final scrolled = tester
+            .state<ScrollableState>(find.byType(Scrollable))
+            .position
+            .pixels;
+        expect(scrolled, greaterThan(0));
+
+        final tile = find.byType(MemoryTile).hitTestable().first;
+        final title = tester.widget<MemoryTile>(tile).photo.title!;
+        await tester.tap(tile);
+        await tester.pumpAndSettle();
+        expect(find.byType(PhotoDetailScreen), findsOneWidget);
+        expect(find.text(title), findsOneWidget);
+
+        await tester.tap(find.byTooltip('Volver'));
+        await tester.pumpAndSettle();
+        expect(find.byType(PhotoDetailScreen), findsNothing);
+        expect(
+          tester
+              .state<ScrollableState>(find.byType(Scrollable))
+              .position
+              .pixels,
+          scrolled,
+        );
+      },
+    );
+
+    testWidgets('gray thumbnails while the photos load (CA9)', (tester) async {
+      tester.view.physicalSize = const Size(430, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BlocProvider(
+            create: (_) => sl<MemoriesBloc>()..add(MemoriesStarted()),
+            child: const MemoriesScreen(),
+          ),
+        ),
+      );
+
+      expect(find.byType(MemoriesGridPlaceholder), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.byType(MemoriesGridPlaceholder), findsNothing);
+    });
+
+    testWidgets('with photos but none analyzed there is no empty grid (CA10)', (
+      tester,
+    ) async {
+      photos.photoCount = 2;
+
+      await pumpMemories(tester);
+
+      expect(find.byType(MemoriesGrid), findsNothing);
+      expect(find.text('Aún no tienes recuerdos'), findsOneWidget);
+    });
+
+    testWidgets('a thumbnail that does not load is a gray box (CA11)', (
+      tester,
+    ) async {
+      connectedWith([
+        memoryPhoto('missing', takenAt: DateTime(2024, 6, 15)),
+        const MemoryPhoto(
+          id: 'broken',
+          title: 'Rota',
+          thumbnailUrl: 'https://example.com/broken.jpg',
+        ),
+      ]);
+
+      await pumpMemories(tester);
+
+      // The test environment answers every request with an error.
+      expect(find.byIcon(Icons.image_outlined), findsNWidgets(2));
+      expect(find.byType(MemoryTile), findsNWidgets(2));
     });
   });
 }
