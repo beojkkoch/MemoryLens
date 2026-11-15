@@ -219,6 +219,21 @@ void main() {
     testWidgets('a missing value shows «—» (CA8)', (tester) async {
       photos.details[invoiceId] = const PhotoDetail(
         id: invoiceId,
+        title: 'Recibo borroso',
+        category: 'Factura',
+      );
+
+      await openDetail(tester, invoiceId);
+
+      expect(find.text('Factura'), findsOneWidget);
+      // Date, purchase type and total.
+      expect(find.text('—'), findsNWidgets(3));
+    });
+
+    testWidgets('a photo that is not an invoice has no purchase fields '
+        '(HU-29, CA1)', (tester) async {
+      photos.details[invoiceId] = const PhotoDetail(
+        id: invoiceId,
         title: 'Atardecer',
         category: 'Lugar',
       );
@@ -226,8 +241,21 @@ void main() {
       await openDetail(tester, invoiceId);
 
       expect(find.text('Lugar'), findsOneWidget);
-      // Date, purchase type and total.
-      expect(find.text('—'), findsNWidgets(3));
+      expect(find.text('Fecha'), findsOneWidget);
+      expect(find.text('Tipo de compra'), findsNothing);
+      expect(find.text('Monto total'), findsNothing);
+    });
+
+    testWidgets('neither does one with no category (HU-29, CA1)', (
+      tester,
+    ) async {
+      photos.details[invoiceId] = const PhotoDetail(id: invoiceId);
+
+      await openDetail(tester, invoiceId);
+
+      expect(find.text('Categoría'), findsOneWidget);
+      expect(find.text('Tipo de compra'), findsNothing);
+      expect(find.text('Monto total'), findsNothing);
     });
 
     testWidgets('the back button goes back to the screen before (CA3)', (

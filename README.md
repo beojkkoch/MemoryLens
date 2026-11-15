@@ -114,8 +114,9 @@ Se abre desde Recuerdos, y más adelante desde el chat, con el id de la foto (HU
 
 - Arriba, la foto en grande ocupa cerca del 70 % de la pantalla y un degradado la une al panel de abajo. Es la copia grande del bucket (hasta 2560 px), firmada solo al abrir el detalle y con validez de 1 h; nunca la miniatura. La foto se ve completa, sin recortar, para que una factura se pueda leer entera.
 - El panel muestra *«ANÁLISIS DE IA»*, el título con un ícono de etiqueta y la descripción que escribió la IA (`foto.texto_alt`).
-- Debajo, en dos columnas: **Fecha** (*«14 jun 2024, 10:27»*), **Categoría**, **Tipo de compra** y **Monto total** (con el formato de su moneda). Se muestra lo que está guardado en la foto, sea de la IA o corregido por la persona, y *«—»* donde no hay dato. Nada de esto se puede editar aquí.
+- Debajo, en dos columnas: **Fecha** (*«14 jun 2024, 10:27»*), **Categoría**, **Tipo de compra** y **Monto total** (con el formato de su moneda). Tipo de compra y Monto total solo aparecen en fotos de categoría **Factura** (HU-29): una foto de paisaje no muestra datos de compra. Se muestra lo que está guardado en la foto, sea de la IA o corregido por la persona, y *«—»* donde no hay dato. Nada de esto se puede editar aquí.
 - El botón de volver, arriba a la izquierda, regresa a la pantalla anterior.
+- La regla para cuando exista la edición está en `PhotoEdit` (HU-29). Si la categoría cambia a Factura, los campos de compra aparecen vacíos para completarlos. Si cambia a otra, se ocultan, pero sus valores se conservan hasta guardar (`toSave()` los borra), así que volver a Factura antes de guardar no pierde nada.
 - Si la foto no existe o es de otra persona (la RLS no la deja ver), aparece *«Foto no encontrada»* con **Volver**. Si la carga falla, el mensaje trae **Reintentar**.
 
 ### 8. Mi perfil

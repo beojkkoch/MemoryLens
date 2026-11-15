@@ -1,3 +1,4 @@
+import 'package:memorylens/features/photo_analysis/domain/entities/invoice_details.dart';
 import 'package:memorylens/features/photo_analysis/domain/entities/money.dart';
 
 /// A photo with what the AI wrote about it and the data it found (HU-28).
@@ -36,6 +37,13 @@ class PhotoDetail {
     this.purchaseType,
     this.total,
   });
+
+  /// Purchase type and total only make sense for an invoice (HU-29, CA1).
+  static bool hasPurchaseFields(String? category) {
+    return category == InvoiceDetails.category;
+  }
+
+  bool get showsPurchaseFields => hasPurchaseFields(category);
 
   @override
   String toString() => 'PhotoDetail($id, $title, $category)';

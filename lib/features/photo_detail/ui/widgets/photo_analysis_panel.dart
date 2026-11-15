@@ -78,11 +78,20 @@ class PhotoAnalysisPanel extends StatelessWidget {
             ),
             second: _Field(label: 'Categoría', value: detail.category),
           ),
-          const SizedBox(height: 16),
-          _FieldRow(
-            first: _Field(label: 'Tipo de compra', value: detail.purchaseType),
-            second: _Field(label: 'Monto total', value: detail.total?.format()),
-          ),
+          // No purchase data on a landscape (HU-29, CA1).
+          if (detail.showsPurchaseFields) ...[
+            const SizedBox(height: 16),
+            _FieldRow(
+              first: _Field(
+                label: 'Tipo de compra',
+                value: detail.purchaseType,
+              ),
+              second: _Field(
+                label: 'Monto total',
+                value: detail.total?.format(),
+              ),
+            ),
+          ],
         ],
       ),
     );
