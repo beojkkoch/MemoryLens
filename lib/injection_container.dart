@@ -52,6 +52,7 @@ import 'package:memorylens/features/photo_analysis/domain/usecases/retry_failed_
 import 'package:memorylens/features/photo_analysis/ui/bloc/photo_analysis_bloc.dart';
 import 'package:memorylens/features/memories/data/source/supabase_photo_data_source.dart';
 import 'package:memorylens/features/memories/domain/repository/photo_repository.dart';
+import 'package:memorylens/features/memories/domain/usecases/count_analyzed_photos_usecase.dart';
 import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
 import 'package:memorylens/features/memories/domain/usecases/get_memories_usecase.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
@@ -117,6 +118,7 @@ void initDependencies() {
   sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
   sl.registerLazySingleton(() => CountPhotosUseCase());
   sl.registerLazySingleton(() => GetMemoriesUseCase());
+  sl.registerLazySingleton(() => CountAnalyzedPhotosUseCase());
   sl.registerLazySingleton(() => ImportGalleryPhotosUseCase());
   sl.registerLazySingleton(() => HasPendingImportUseCase());
   sl.registerLazySingleton(() => AnalyzePendingPhotosUseCase());

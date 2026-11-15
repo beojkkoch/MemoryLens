@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:memorylens/features/photo_analysis/domain/entities/photo_analysis_outcome.dart';
 import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
@@ -7,6 +9,7 @@ import 'package:memorylens/features/gallery_access/domain/usecases/check_gallery
 import 'package:memorylens/features/gallery_access/domain/usecases/open_gallery_settings_usecase.dart';
 import 'package:memorylens/features/gallery_access/domain/usecases/request_gallery_access_usecase.dart';
 import 'package:memorylens/features/memories/domain/repository/photo_repository.dart';
+import 'package:memorylens/features/memories/domain/usecases/count_analyzed_photos_usecase.dart';
 import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
 import 'package:memorylens/features/memories/domain/usecases/get_memories_usecase.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
@@ -35,6 +38,7 @@ void main() {
     sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
     sl.registerLazySingleton(() => CountPhotosUseCase());
     sl.registerLazySingleton(() => GetMemoriesUseCase());
+    sl.registerLazySingleton(() => CountAnalyzedPhotosUseCase());
     // Recuerdos asks whether an import was left half done.
     importFakes = registerGalleryImportFakes();
     bloc = MemoriesBloc();
@@ -114,6 +118,80 @@ void main() {
       expect(bloc.state.status, MemoriesStatus.failure);
       expect(bloc.state.errorMessage, AppException.genericMessage);
     });
+  });
+
+  group('more photos while scrolling (HU-15)', () {
+    const pageSize = GetMemoriesUseCase.pageSize;
+
+    test('the first load brings one page and the real total', () async {
+      photos.photoCount = 1000;
+      photos.analyzedPhotos = manyPhotos(1000);
+
+      await send([MemoriesStarted()]);
+
+      expect(bloc.state.timeline.photos, hasLength(pageSize));
+      expect(bloc.state.timeline.hasMore, isTrue);
+      expect(bloc.state.analyzedCount, 1000);
+    });
+
+    test('near the end the next page is added', () async {
+      photos.photoCount = 1000;
+      photos.analyzedPhotos = manyPhotos(1000);
+      await send([MemoriesStarted()]);
+
+      await send([MoreMemoriesRequested()]);
+
+      expect(bloc.state.timeline.photos, hasLength(2 * pageSize));
+      expect(bloc.state.loadingMore, isFalse);
+      expect(bloc.state.analyzedCount, 1000);
+    });
+
+    test('shows that it is loading and asks for one page at a time', () async {
+      photos.photoCount = 1000;
+      photos.analyzedPhotos = manyPhotos(1000);
+      await send([MemoriesStarted()]);
+      photos.nextPageGate = Completer<void>();
+
+      await send([MoreMemoriesRequested(), MoreMemoriesRequested()]);
+      expect(bloc.state.loadingMore, isTrue);
+
+      photos.nextPageGate!.complete();
+      await pumpEventQueue();
+      expect(bloc.state.loadingMore, isFalse);
+      expect(photos.pageOffsets, [0, pageSize]);
+    });
+
+    test('with everything loaded nothing else is asked', () async {
+      photos.photoCount = 3;
+      photos.analyzedPhotos = manyPhotos(3);
+      await send([MemoriesStarted()]);
+
+      await send([MoreMemoriesRequested()]);
+
+      expect(photos.pageOffsets, [0]);
+    });
+
+    test(
+      'a failed page keeps what was loaded and can be asked again',
+      () async {
+        photos.photoCount = 1000;
+        photos.analyzedPhotos = manyPhotos(1000);
+        await send([MemoriesStarted()]);
+        photos.nextPageError = const AppException(
+          'No pudimos conectarnos.',
+          kind: AppErrorKind.network,
+        );
+
+        await send([MoreMemoriesRequested()]);
+        expect(bloc.state.status, MemoriesStatus.ready);
+        expect(bloc.state.loadingMore, isFalse);
+        expect(bloc.state.timeline.photos, hasLength(pageSize));
+
+        photos.nextPageError = null;
+        await send([MoreMemoriesRequested()]);
+        expect(bloc.state.timeline.photos, hasLength(2 * pageSize));
+      },
+    );
   });
 
   group('an import left half done', () {
@@ -320,6 +398,7 @@ void main() {
           memoryPhoto('p1'),
           memoryPhoto('p2'),
         ]);
+        photos.recentIds.add('p2');
 
         bloc.add(MemoriesStarted());
         final state = await until((s) => s.newPhotosAnalyzed > 0);

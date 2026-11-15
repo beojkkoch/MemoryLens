@@ -13,35 +13,75 @@ const _gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
 );
 
 /// The timeline of Recuerdos: a title per day and its photos below (HU-12).
+///
+/// The tiles are built only as they get close to the screen, so the
+/// thumbnails off screen are not downloaded yet (HU-15, CA4).
 class MemoriesGrid extends StatelessWidget {
+  /// How close to the end, in pixels, the next page is asked for. About
+  /// five rows, so it usually arrives before the person gets there (CA2).
+  static const loadMoreDistance = 800.0;
+
   final List<MemoryGroup> groups;
   final ValueChanged<MemoryPhoto> onOpen;
 
-  const MemoriesGrid({super.key, required this.groups, required this.onOpen});
+  /// Shows the indicator at the end (HU-15, CA3).
+  final bool loadingMore;
+
+  /// Called, maybe many times, while the person is close to the end.
+  final VoidCallback? onNearEnd;
+
+  const MemoriesGrid({
+    super.key,
+    required this.groups,
+    required this.onOpen,
+    this.loadingMore = false,
+    this.onNearEnd,
+  });
+
+  bool _onScroll(ScrollNotification notification) {
+    if (notification.metrics.extentAfter < loadMoreDistance) {
+      onNearEnd?.call();
+    }
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    return CustomScrollView(
-      // Keeps the scroll position when the person comes back from a photo
-      // (CA7), even if the grid is built again.
-      key: const PageStorageKey('memories-grid'),
-      slivers: [
-        for (final group in groups) ...[
-          SliverToBoxAdapter(
-            child: _DayTitle(MemoryDates.dayLabel(group.day, now)),
-          ),
-          SliverGrid.builder(
-            gridDelegate: _gridDelegate,
-            itemCount: group.photos.length,
-            itemBuilder: (context, index) {
-              final photo = group.photos[index];
-              return MemoryTile(photo: photo, onTap: () => onOpen(photo));
-            },
-          ),
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: CustomScrollView(
+        // Keeps the scroll position when the person comes back from a photo
+        // (CA7), even if the grid is built again.
+        key: const PageStorageKey('memories-grid'),
+        slivers: [
+          for (final group in groups) ...[
+            SliverToBoxAdapter(
+              child: _DayTitle(MemoryDates.dayLabel(group.day, now)),
+            ),
+            SliverGrid.builder(
+              gridDelegate: _gridDelegate,
+              itemCount: group.photos.length,
+              itemBuilder: (context, index) {
+                final photo = group.photos[index];
+                return MemoryTile(photo: photo, onTap: () => onOpen(photo));
+              },
+            ),
+          ],
+          if (loadingMore)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    semanticsLabel: 'Cargando más fotos',
+                  ),
+                ),
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
         ],
-        const SliverToBoxAdapter(child: SizedBox(height: 16)),
-      ],
+      ),
     );
   }
 }

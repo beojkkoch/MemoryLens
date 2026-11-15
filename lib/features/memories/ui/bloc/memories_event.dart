@@ -49,6 +49,14 @@ class MemoriesResumed extends MemoriesEvent {
   }
 }
 
+/// The person scrolled close to the end of the timeline (HU-15, CA2).
+class MoreMemoriesRequested extends MemoriesEvent {
+  @override
+  String toString() {
+    return 'MoreMemoriesRequested()';
+  }
+}
+
 /// The person closed «N nuevas fotos analizadas» or pressed «Revisar
 /// etiquetas».
 class NewPhotosNoticeDismissed extends MemoriesEvent {

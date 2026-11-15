@@ -12,7 +12,23 @@ class PhotoRepositoryImpl implements PhotoRepository {
   }
 
   @override
-  Future<List<MemoryPhoto>> analyzed() {
-    return _dataSource.analyzed();
+  Future<int> countAnalyzed() {
+    return _dataSource.countAnalyzed();
+  }
+
+  @override
+  Future<List<MemoryPhoto>> analyzed({
+    required int offset,
+    required int limit,
+  }) {
+    return _dataSource.analyzed(offset: offset, limit: limit);
+  }
+
+  @override
+  Future<List<MemoryPhoto>> analyzedSince({
+    required DateTime since,
+    DateTime? takenAfter,
+  }) {
+    return _dataSource.analyzedSince(since: since, takenAfter: takenAfter);
   }
 }
