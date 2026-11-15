@@ -11,12 +11,15 @@ import 'package:memorylens/features/memories/ui/bloc/memories_state.dart';
 import 'package:memorylens/features/memories/ui/widgets/access_denied_notice.dart';
 import 'package:memorylens/features/memories/ui/widgets/empty_memories_view.dart';
 import 'package:memorylens/features/memories/ui/widgets/gallery_consent_dialog.dart';
+import 'package:memorylens/features/memories/ui/widgets/memories_grid.dart';
 import 'package:memorylens/features/memories/ui/widgets/memories_header.dart';
+import 'package:memorylens/features/memories/ui/widgets/memory_dates.dart';
 import 'package:memorylens/features/memories/ui/widgets/new_photos_notice.dart';
 import 'package:memorylens/theme/app_theme.dart';
 
 /// Home of the app. While the gallery is not connected it invites the person
-/// to connect it. Needs a MemoriesBloc above it.
+/// to connect it; then it shows the analyzed photos grouped by date (HU-12).
+/// Needs a MemoriesBloc above it.
 class MemoriesScreen extends StatefulWidget {
   const MemoriesScreen({super.key});
 
@@ -75,10 +78,12 @@ class _MemoriesScreenState extends State<MemoriesScreen>
         builder: (context, state) {
           final showConnect =
               state.status == MemoriesStatus.ready && !state.hasPhotos;
+          final newest = state.newestTakenAt;
           return Scaffold(
             backgroundColor: AppColors.canvas,
             appBar: MemoryLensAppBar(
               title: 'Recuerdos',
+              subtitle: newest == null ? null : MemoryDates.monthLabel(newest),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.person_outline),
@@ -102,7 +107,7 @@ class _MemoriesScreenState extends State<MemoriesScreen>
   Widget _body(BuildContext context, MemoriesState state) {
     switch (state.status) {
       case MemoriesStatus.loading:
-        return const Center(child: CircularProgressIndicator());
+        return const MemoriesGridPlaceholder();
       case MemoriesStatus.failure:
         return ErrorRetryView(
           message: state.errorMessage ?? 'No se pudieron cargar tus recuerdos',
@@ -113,7 +118,7 @@ class _MemoriesScreenState extends State<MemoriesScreen>
           children: [
             MemoriesHeader(
               connected: state.hasPhotos,
-              photoCount: state.photoCount,
+              photoCount: state.analyzedCount,
             ),
             if (state.newPhotos > 0) NewPhotosProgress(count: state.newPhotos),
             if (state.newPhotosAnalyzed > 0)
@@ -128,10 +133,21 @@ class _MemoriesScreenState extends State<MemoriesScreen>
                   NewPhotosNoticeDismissed(),
                 ),
               ),
+            // With no analyzed photo there is no empty grid, only the empty
+            // gallery (CA10).
             Expanded(
-              child: state.hasPhotos
-                  ? const _PhotosPlaceholder()
-                  : _EmptyBody(state: state),
+              child: state.groups.isEmpty
+                  ? _EmptyBody(state: state)
+                  : MemoriesGrid(
+                      groups: state.groups,
+                      // Pushed on top, so Recuerdos and its scroll stay
+                      // below (CA7).
+                      onOpen: (photo) => Navigator.pushNamed(
+                        context,
+                        '/foto',
+                        arguments: photo,
+                      ),
+                    ),
             ),
           ],
         );
@@ -167,25 +183,6 @@ class _EmptyBody extends StatelessWidget {
           ErrorMessage(message: state.errorMessage!),
         ],
       ],
-    );
-  }
-}
-
-/// Stands in for the photo grid until it is built.
-class _PhotosPlaceholder extends StatelessWidget {
-  const _PhotosPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 24),
-        child: Text(
-          'Tus recuerdos aparecerán aquí',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-        ),
-      ),
     );
   }
 }

@@ -5,14 +5,17 @@ import 'package:memorylens/theme/app_theme.dart';
 /// Top bar with the back arrow, the "MEMORY LENS" label and the screen title.
 /// [onBack] replaces the default pop, e.g. to go back one step of a form.
 /// [actions] are the icon buttons on the right, like the profile shortcut.
+/// [subtitle] is a small line under the title, like the month of Recuerdos.
 class MemoryLensAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+  final String? subtitle;
   final Function()? onBack;
   final List<Widget>? actions;
 
   const MemoryLensAppBar({
     super.key,
     required this.title,
+    this.subtitle,
     this.onBack,
     this.actions,
   });
@@ -50,6 +53,14 @@ class MemoryLensAppBar extends StatelessWidget implements PreferredSizeWidget {
             title,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
+          if (subtitle != null)
+            Text(
+              subtitle!,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
         ],
       ),
     );

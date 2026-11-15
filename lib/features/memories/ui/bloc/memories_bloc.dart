@@ -8,6 +8,7 @@ import 'package:memorylens/features/gallery_import/domain/usecases/count_new_pho
 import 'package:memorylens/features/gallery_import/domain/usecases/has_pending_import_usecase.dart';
 import 'package:memorylens/features/gallery_import/domain/usecases/import_new_photos_usecase.dart';
 import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
+import 'package:memorylens/features/memories/domain/usecases/get_memories_usecase.dart';
 import 'package:memorylens/features/photo_analysis/domain/usecases/has_pending_analysis_usecase.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_state.dart';
@@ -24,6 +25,7 @@ import 'package:memorylens/injection_container.dart';
 /// analyzed by themselves (HU-11).
 class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
   final CountPhotosUseCase _countPhotos = sl();
+  final GetMemoriesUseCase _getMemories = sl();
   final RequestGalleryAccessUseCase _requestAccess = sl();
   final CheckGalleryAccessUseCase _checkAccess = sl();
   final OpenGallerySettingsUseCase _openSettings = sl();
@@ -53,7 +55,14 @@ class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
     emit(state.copyWith(status: MemoriesStatus.loading));
     try {
       final count = await _countPhotos();
-      emit(state.copyWith(status: MemoriesStatus.ready, photoCount: count));
+      final groups = await _getMemories();
+      emit(
+        state.copyWith(
+          status: MemoriesStatus.ready,
+          photoCount: count,
+          groups: groups,
+        ),
+      );
     } catch (e, stack) {
       addError(e, stack);
       emit(
@@ -86,10 +95,13 @@ class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
 
       final analyzed = await _importNewPhotos();
       final count = await _countPhotos();
+      // The timeline and its total follow the analysis (HU-12, CA6).
+      final groups = await _getMemories();
       if (emit.isDone) return;
       emit(
         state.copyWith(
           photoCount: count,
+          groups: groups,
           newPhotos: 0,
           newPhotosAnalyzed: state.newPhotosAnalyzed + analyzed,
           errorMessage: state.errorMessage,

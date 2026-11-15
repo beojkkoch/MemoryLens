@@ -1,3 +1,5 @@
+import 'package:memorylens/features/memories/domain/entities/memory_group.dart';
+
 /// How the load of the photo count went.
 enum MemoriesStatus { loading, ready, failure }
 
@@ -37,6 +39,9 @@ class MemoriesState {
   /// hides the notice.
   final int newPhotosAnalyzed;
 
+  /// The analyzed photos, grouped by the day they were taken (HU-12).
+  final List<MemoryGroup> groups;
+
   const MemoriesState({
     this.status = MemoriesStatus.loading,
     this.photoCount = 0,
@@ -44,9 +49,20 @@ class MemoriesState {
     this.errorMessage,
     this.newPhotos = 0,
     this.newPhotosAnalyzed = 0,
+    this.groups = const [],
   });
 
   bool get hasPhotos => photoCount > 0;
+
+  /// For «128 fotos» (HU-12, CA6).
+  int get analyzedCount {
+    return groups.fold(0, (total, group) => total + group.photos.length);
+  }
+
+  /// When the newest photo was taken, for «Junio 2024» (HU-12, CA5).
+  DateTime? get newestTakenAt {
+    return groups.isEmpty ? null : groups.first.photos.first.takenAt;
+  }
 
   /// errorMessage is not carried over: every copy clears it unless given.
   MemoriesState copyWith({
@@ -56,6 +72,7 @@ class MemoriesState {
     String? errorMessage,
     int? newPhotos,
     int? newPhotosAnalyzed,
+    List<MemoryGroup>? groups,
   }) {
     return MemoriesState(
       status: status ?? this.status,
@@ -64,6 +81,7 @@ class MemoriesState {
       errorMessage: errorMessage,
       newPhotos: newPhotos ?? this.newPhotos,
       newPhotosAnalyzed: newPhotosAnalyzed ?? this.newPhotosAnalyzed,
+      groups: groups ?? this.groups,
     );
   }
 
@@ -71,6 +89,7 @@ class MemoriesState {
   String toString() {
     return 'MemoriesState(status: ${status.name}, photos: $photoCount, '
         'access: ${access.name}, error: $errorMessage, '
-        'newPhotos: $newPhotos, newPhotosAnalyzed: $newPhotosAnalyzed)';
+        'newPhotos: $newPhotos, newPhotosAnalyzed: $newPhotosAnalyzed, '
+        'analyzed: $analyzedCount)';
   }
 }
