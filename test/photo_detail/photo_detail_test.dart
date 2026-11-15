@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,12 +8,16 @@ import 'package:memorylens/features/memories/ui/widgets/memory_dates.dart';
 import 'package:memorylens/features/photo_analysis/domain/entities/money.dart';
 import 'package:memorylens/features/photo_detail/data/source/supabase_photo_detail_data_source.dart';
 import 'package:memorylens/features/photo_detail/domain/entities/photo_detail.dart';
+import 'package:memorylens/features/photo_detail/domain/entities/photo_edit.dart';
 import 'package:memorylens/features/photo_detail/domain/repository/photo_detail_repository.dart';
+import 'package:memorylens/features/photo_detail/domain/usecases/get_categories_usecase.dart';
 import 'package:memorylens/features/photo_detail/domain/usecases/get_photo_detail_usecase.dart';
+import 'package:memorylens/features/photo_detail/domain/usecases/save_photo_edit_usecase.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_bloc.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_event.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_state.dart';
 import 'package:memorylens/features/photo_detail/ui/screens/photo_detail_screen.dart';
+import 'package:memorylens/features/photo_detail/ui/widgets/photo_analysis_panel.dart';
 import 'package:memorylens/injection_container.dart';
 
 import 'fake_photo_detail_repository.dart';
@@ -36,6 +42,8 @@ void main() {
     photos = FakePhotoDetailRepository();
     sl.registerSingleton<PhotoDetailRepository>(photos);
     sl.registerLazySingleton(() => GetPhotoDetailUseCase());
+    sl.registerLazySingleton(() => GetCategoriesUseCase());
+    sl.registerLazySingleton(() => SavePhotoEditUseCase());
     sl.registerFactory(() => PhotoDetailBloc());
   });
 
@@ -132,6 +140,19 @@ void main() {
   });
 
   group('the screen', () {
+    /// What a text field of the panel holds.
+    String fieldText(WidgetTester tester, Key key) {
+      return tester
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byKey(key),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .controller
+          .text;
+    }
+
     /// Opens the detail of [photoId] on top of a first screen, the way
     /// Recuerdos does.
     Future<void> openDetail(WidgetTester tester, String photoId) async {
@@ -148,6 +169,7 @@ void main() {
                 child: const Text('Inicio'),
               ),
             ),
+            '/recuerdos': (_) => const Scaffold(body: Text('Recuerdos')),
             '/foto': (context) {
               final id = ModalRoute.of(context)!.settings.arguments as String;
               return BlocProvider(
@@ -182,11 +204,20 @@ void main() {
       expect(find.text('Categoría'), findsOneWidget);
       expect(find.text('Factura'), findsOneWidget);
       expect(find.text('Tipo de compra'), findsOneWidget);
-      expect(find.text('Cafetería'), findsOneWidget);
+      expect(
+        fieldText(tester, PhotoAnalysisPanel.purchaseTypeKey),
+        'Cafetería',
+      );
       expect(find.text('Monto total'), findsOneWidget);
-      expect(find.text(r'$23.100'), findsOneWidget);
-      // Nothing to type in: the data cannot be edited.
-      expect(find.byType(EditableText), findsNothing);
+      expect(fieldText(tester, PhotoAnalysisPanel.amountKey), '23100');
+      // The date is plain text, not a field.
+      expect(
+        find.ancestor(
+          of: find.text('14 jun 2024, 10:27'),
+          matching: find.byType(EditableText),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('the fields go in two columns (CA6)', (tester) async {
@@ -226,8 +257,10 @@ void main() {
       await openDetail(tester, invoiceId);
 
       expect(find.text('Factura'), findsOneWidget);
-      // Date, purchase type and total.
-      expect(find.text('—'), findsNWidgets(3));
+      // The date shows «—», and the empty fields have it as their hint.
+      expect(find.text('—'), findsWidgets);
+      expect(fieldText(tester, PhotoAnalysisPanel.purchaseTypeKey), '');
+      expect(fieldText(tester, PhotoAnalysisPanel.amountKey), '');
     });
 
     testWidgets('a photo that is not an invoice has no purchase fields '
@@ -295,6 +328,342 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Café en Juan Valdez'), findsOneWidget);
+    });
+  });
+
+  group('correcting the data (HU-30)', () {
+    Future<void> openDetail(WidgetTester tester, String photoId) async {
+      tester.view.physicalSize = const Size(430, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          routes: {
+            '/': (context) => Scaffold(
+              body: TextButton(
+                onPressed: () =>
+                    Navigator.pushNamed(context, '/foto', arguments: photoId),
+                child: const Text('Inicio'),
+              ),
+            ),
+            '/recuerdos': (_) => const Scaffold(body: Text('Recuerdos')),
+            '/foto': (context) {
+              final id = ModalRoute.of(context)!.settings.arguments as String;
+              return BlocProvider(
+                create: (_) =>
+                    sl<PhotoDetailBloc>()..add(PhotoDetailRequested(id)),
+                child: PhotoDetailScreen(photoId: id),
+              );
+            },
+          },
+        ),
+      );
+      await tester.tap(find.text('Inicio'));
+      await tester.pumpAndSettle();
+    }
+
+    String fieldText(WidgetTester tester, Key key) {
+      return tester
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byKey(key),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .controller
+          .text;
+    }
+
+    Future<void> pressDone(WidgetTester tester) async {
+      await tester.ensureVisible(find.text('Hecho'));
+      await tester.tap(find.text('Hecho'));
+      await tester.pump();
+    }
+
+    Future<void> chooseCategory(WidgetTester tester, String name) async {
+      await tester.ensureVisible(find.byKey(PhotoAnalysisPanel.categoryKey));
+      await tester.tap(find.byKey(PhotoAnalysisPanel.categoryKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(name).last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('purchase type and total of an invoice can be changed and '
+        'saved; then the home opens (CA1, CA7)', (tester) async {
+      photos.details[invoiceId] = invoice;
+      await openDetail(tester, invoiceId);
+
+      await tester.enterText(
+        find.byKey(PhotoAnalysisPanel.purchaseTypeKey),
+        'Restaurante',
+      );
+      await tester.enterText(find.byKey(PhotoAnalysisPanel.amountKey), '45000');
+      await pressDone(tester);
+      await tester.pumpAndSettle();
+
+      expect(photos.saved.single.$1, invoiceId);
+      expect(
+        photos.saved.single.$2,
+        const PhotoEdit(
+          category: 'Factura',
+          purchaseType: 'Restaurante',
+          total: Money(amount: 45000, currency: 'COP'),
+        ),
+      );
+      expect(find.text('Recuerdos'), findsOneWidget);
+      expect(find.byType(PhotoDetailScreen), findsNothing);
+    });
+
+    testWidgets('the amount shows its currency and takes up to 2 decimals '
+        '(CA2)', (tester) async {
+      photos.details[invoiceId] = const PhotoDetail(
+        id: invoiceId,
+        category: 'Factura',
+        total: Money(amount: 23.1, currency: 'USD'),
+      );
+      await openDetail(tester, invoiceId);
+      final amount = find.byKey(PhotoAnalysisPanel.amountKey);
+
+      expect(find.text(r'$ '), findsOneWidget);
+      expect(fieldText(tester, PhotoAnalysisPanel.amountKey), '23.10');
+
+      await tester.enterText(amount, '12,5');
+      expect(fieldText(tester, PhotoAnalysisPanel.amountKey), '12,5');
+      await tester.enterText(amount, '12.345');
+      expect(fieldText(tester, PhotoAnalysisPanel.amountKey), '12,5');
+      await tester.enterText(amount, '12a');
+      expect(fieldText(tester, PhotoAnalysisPanel.amountKey), '12,5');
+
+      await pressDone(tester);
+      await tester.pumpAndSettle();
+      expect(
+        photos.saved.single.$2.total,
+        const Money(amount: 12.5, currency: 'USD'),
+      );
+    });
+
+    testWidgets('a negative amount cannot be typed, nor saved as 0 (CA3)', (
+      tester,
+    ) async {
+      photos.details[invoiceId] = invoice;
+      await openDetail(tester, invoiceId);
+      final amount = find.byKey(PhotoAnalysisPanel.amountKey);
+
+      await tester.enterText(amount, '-500');
+      expect(fieldText(tester, PhotoAnalysisPanel.amountKey), '23100');
+
+      await tester.enterText(amount, '0');
+      await pressDone(tester);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(SavePhotoEditUseCase.invalidAmountMessage),
+        findsOneWidget,
+      );
+      expect(photos.saved, isEmpty);
+    });
+
+    testWidgets('the category offers the catalog and is saved (CA5)', (
+      tester,
+    ) async {
+      photos.details[invoiceId] = const PhotoDetail(
+        id: invoiceId,
+        title: 'Perro',
+        category: 'Personas',
+      );
+      await openDetail(tester, invoiceId);
+
+      await tester.tap(find.byKey(PhotoAnalysisPanel.categoryKey));
+      await tester.pumpAndSettle();
+      for (final name in photos.categoryNames) {
+        expect(find.text(name), findsWidgets);
+      }
+      await tester.tap(find.text('Mascotas').last);
+      await tester.pumpAndSettle();
+      await pressDone(tester);
+      await tester.pumpAndSettle();
+
+      expect(photos.saved.single.$2, const PhotoEdit(category: 'Mascotas'));
+    });
+
+    testWidgets('an empty category is not accepted (CA5)', (tester) async {
+      photos.details[invoiceId] = const PhotoDetail(id: invoiceId);
+      await openDetail(tester, invoiceId);
+
+      await pressDone(tester);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(SavePhotoEditUseCase.missingCategoryMessage),
+        findsOneWidget,
+      );
+      expect(photos.saved, isEmpty);
+    });
+
+    testWidgets('moving a photo to «Factura» shows the purchase fields empty '
+        '(HU-29, CA2)', (tester) async {
+      photos.details[invoiceId] = const PhotoDetail(
+        id: invoiceId,
+        category: 'Lugar',
+      );
+      await openDetail(tester, invoiceId);
+      expect(find.byKey(PhotoAnalysisPanel.amountKey), findsNothing);
+
+      await chooseCategory(tester, 'Factura');
+
+      expect(fieldText(tester, PhotoAnalysisPanel.purchaseTypeKey), '');
+      expect(fieldText(tester, PhotoAnalysisPanel.amountKey), '');
+    });
+
+    testWidgets('another category hides the purchase data and saving clears '
+        'it (HU-29, CA3)', (tester) async {
+      photos.details[invoiceId] = invoice;
+      await openDetail(tester, invoiceId);
+
+      await chooseCategory(tester, 'Comida');
+      expect(find.byKey(PhotoAnalysisPanel.purchaseTypeKey), findsNothing);
+      // Back to «Factura» before saving: nothing was lost.
+      await chooseCategory(tester, 'Factura');
+      expect(
+        fieldText(tester, PhotoAnalysisPanel.purchaseTypeKey),
+        'Cafetería',
+      );
+
+      await chooseCategory(tester, 'Comida');
+      await pressDone(tester);
+      await tester.pumpAndSettle();
+
+      expect(photos.saved.single.$2, const PhotoEdit(category: 'Comida'));
+    });
+
+    testWidgets('the button shows it is saving (CA8)', (tester) async {
+      photos.details[invoiceId] = invoice;
+      photos.saveGate = Completer<void>();
+      await openDetail(tester, invoiceId);
+
+      await pressDone(tester);
+
+      expect(find.text('Hecho'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(PhotoAnalysisPanel),
+          matching: find.byType(CircularProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+      photos.saveGate!.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Recuerdos'), findsOneWidget);
+    });
+
+    testWidgets('a failed save says so and keeps the changes (CA8)', (
+      tester,
+    ) async {
+      photos.details[invoiceId] = invoice;
+      photos.saveError = const AppException('No pudimos conectarnos.');
+      await openDetail(tester, invoiceId);
+
+      await tester.enterText(
+        find.byKey(PhotoAnalysisPanel.purchaseTypeKey),
+        'Restaurante',
+      );
+      await pressDone(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.text('No pudimos conectarnos.'), findsOneWidget);
+      expect(find.byType(PhotoDetailScreen), findsOneWidget);
+      expect(
+        fieldText(tester, PhotoAnalysisPanel.purchaseTypeKey),
+        'Restaurante',
+      );
+
+      photos.saveError = null;
+      await pressDone(tester);
+      await tester.pumpAndSettle();
+      expect(photos.saved.single.$2.purchaseType, 'Restaurante');
+    });
+
+    testWidgets('opening the photo again shows what was saved (CA9)', (
+      tester,
+    ) async {
+      photos.details[invoiceId] = invoice;
+      await openDetail(tester, invoiceId);
+      await tester.enterText(find.byKey(PhotoAnalysisPanel.amountKey), '9900');
+      await pressDone(tester);
+      await tester.pumpAndSettle();
+
+      // A fresh app, as when the person opens the photo another day.
+      await tester.pumpWidget(const SizedBox());
+      await openDetail(tester, invoiceId);
+
+      expect(fieldText(tester, PhotoAnalysisPanel.amountKey), '9900');
+      expect(
+        fieldText(tester, PhotoAnalysisPanel.purchaseTypeKey),
+        'Cafetería',
+      );
+    });
+  });
+
+  group('saving the corrections (HU-30)', () {
+    test('outside «Factura» the purchase data is not sent', () async {
+      await SavePhotoEditUseCase()(
+        invoiceId,
+        const PhotoEdit(
+          category: 'Comida',
+          purchaseType: 'Cafetería',
+          total: Money(amount: 10, currency: 'COP'),
+        ),
+      );
+
+      expect(photos.saved.single.$2, const PhotoEdit(category: 'Comida'));
+    });
+
+    test('an empty category or a non positive amount is not saved', () async {
+      expect(
+        () => SavePhotoEditUseCase()(invoiceId, const PhotoEdit(category: ' ')),
+        throwsA(isA<AppException>()),
+      );
+      expect(
+        () => SavePhotoEditUseCase()(
+          invoiceId,
+          const PhotoEdit(
+            category: 'Factura',
+            total: Money(amount: -1, currency: 'COP'),
+          ),
+        ),
+        throwsA(isA<AppException>()),
+      );
+      expect(photos.saved, isEmpty);
+    });
+
+    test('the parameters of guardar_correccion_foto', () {
+      expect(
+        SupabasePhotoDetailDataSource.paramsFor(
+          invoiceId,
+          const PhotoEdit(
+            category: 'Factura',
+            purchaseType: 'Cafetería',
+            total: Money(amount: 23.1, currency: 'USD'),
+          ),
+        ),
+        {
+          'p_foto_id': invoiceId,
+          'p_categoria': 'Factura',
+          'p_tipo_compra': 'Cafetería',
+          'p_monto': 23.1,
+          'p_moneda': 'USD',
+        },
+      );
+    });
+
+    test('the amount pattern takes up to 2 decimals and no sign', () {
+      final pattern = PhotoAnalysisPanel.amountPattern;
+      for (final ok in ['', '0', '23100', '23.1', '23,10', '23.']) {
+        expect(pattern.hasMatch(ok), isTrue, reason: ok);
+      }
+      for (final bad in ['-1', '1.234', '1e5', 'abc', '1.2.3', '12345678901']) {
+        expect(pattern.hasMatch(bad), isFalse, reason: bad);
+      }
     });
   });
 }

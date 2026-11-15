@@ -21,7 +21,9 @@ import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
 import 'package:memorylens/features/memories/ui/screens/memories_screen.dart';
 import 'package:memorylens/features/memories/ui/widgets/memories_grid.dart';
 import 'package:memorylens/features/photo_detail/domain/repository/photo_detail_repository.dart';
+import 'package:memorylens/features/photo_detail/domain/usecases/get_categories_usecase.dart';
 import 'package:memorylens/features/photo_detail/domain/usecases/get_photo_detail_usecase.dart';
+import 'package:memorylens/features/photo_detail/domain/usecases/save_photo_edit_usecase.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_bloc.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_event.dart';
 import 'package:memorylens/features/photo_detail/ui/screens/photo_detail_screen.dart';
@@ -62,6 +64,8 @@ void main() {
       FakePhotoDetailRepository()..answerEveryId = true,
     );
     sl.registerLazySingleton(() => GetPhotoDetailUseCase());
+    sl.registerLazySingleton(() => GetCategoriesUseCase());
+    sl.registerLazySingleton(() => SavePhotoEditUseCase());
     sl.registerFactory(() => PhotoDetailBloc());
     // Analizando imports the photos, and Recuerdos asks if an import is
     // pending, so both need the import fakes.
