@@ -114,9 +114,12 @@ Se abre desde Recuerdos, y más adelante desde el chat, con el id de la foto (HU
 
 - Arriba, la foto en grande ocupa cerca del 70 % de la pantalla y un degradado la une al panel de abajo. Es la copia grande del bucket (hasta 2560 px), firmada solo al abrir el detalle y con validez de 1 h; nunca la miniatura. La foto se ve completa, sin recortar, para que una factura se pueda leer entera.
 - El panel muestra *«ANÁLISIS DE IA»*, el título con un ícono de etiqueta y la descripción que escribió la IA (`foto.texto_alt`).
-- Debajo, en dos columnas: **Fecha** (*«14 jun 2024, 10:27»*), **Categoría**, **Tipo de compra** y **Monto total** (con el formato de su moneda). Tipo de compra y Monto total solo aparecen en fotos de categoría **Factura** (HU-29): una foto de paisaje no muestra datos de compra. Se muestra lo que está guardado en la foto, sea de la IA o corregido por la persona, y *«—»* donde no hay dato. Nada de esto se puede editar aquí.
+- Debajo, en dos columnas: **Fecha** (*«14 jun 2024, 10:27»*, no se puede editar), **Categoría**, **Tipo de compra** y **Monto total**. Tipo de compra y Monto total solo aparecen en fotos de categoría **Factura** (HU-29): una foto de paisaje no muestra datos de compra. Se muestra lo que está guardado en la foto, sea de la IA o corregido por la persona, y *«—»* donde no hay dato.
 - El botón de volver, arriba a la izquierda, regresa a la pantalla anterior.
-- La regla para cuando exista la edición está en `PhotoEdit` (HU-29). Si la categoría cambia a Factura, los campos de compra aparecen vacíos para completarlos. Si cambia a otra, se ocultan, pero sus valores se conservan hasta guardar (`toSave()` los borra), así que volver a Factura antes de guardar no pierde nada.
+- **Corregir los datos (HU-30):** la categoría se elige del catálogo del sistema (tabla `categoria`) y no puede quedar vacía. En una factura también se corrigen el tipo de compra (hasta 40 caracteres) y el monto. El monto muestra el símbolo de su moneda, solo acepta números con hasta 2 decimales (con punto o coma) y no deja escribir un signo menos ni guardar 0. Una factura que no tenía monto usa COP (`PhotoEdit.defaultCurrency`).
+  - Al cambiar a Factura, los campos de compra aparecen vacíos para completarlos. Al cambiar a otra categoría se ocultan, pero sus valores se conservan hasta tocar **Hecho**, así que volver a Factura antes de guardar no pierde nada (`PhotoEdit`, HU-29).
+  - **Hecho** guarda con la función SQL `guardar_correccion_foto`, que vuelve a validar todo, borra los datos de compra fuera de Factura y reemplaza la etiqueta del tipo de compra anterior por la corregida, ya confirmada. Mientras guarda, el botón muestra la carga; si falla, se ve el error y la persona sigue en el detalle con lo que escribió. Si sale bien, se abre **Recuerdos**.
+  - Las correcciones quedan en las mismas columnas que escribe la IA (`categoria_id`, `tipo_compra`, `monto`, `moneda`), así que al volver a abrir la foto se ven, y los filtros y el chat las usan. El embedding de texto de la foto no se recalcula al corregir.
 - Si la foto no existe o es de otra persona (la RLS no la deja ver), aparece *«Foto no encontrada»* con **Volver**. Si la carga falla, el mensaje trae **Reintentar**.
 
 ### 8. Mi perfil
@@ -142,6 +145,8 @@ npx supabase db push
 ```
 
 La importación de fotos necesita la migración `20261114120000_import_gallery_photos.sql` (bucket `fotos`, políticas de Storage y columnas nuevas): corre `npx supabase db push` antes de probar **Analizando**.
+
+Las correcciones del detalle necesitan la migración `20261115160000_save_photo_corrections.sql` (`guardar_correccion_foto`): corre `npx supabase db push`.
 
 El análisis con IA necesita cuatro migraciones: `20261115120000_analyze_photos.sql` (pgvector, `estado_analisis`, embeddings y las funciones `guardar_analisis_foto` y `marcar_error_analisis_foto`), `20261115130000_invoice_details.sql` (moneda de las facturas; también devuelve a la cola, una sola vez, las facturas ya analizadas para leerles el monto) `20261115140000_analysis_retries.sql` (intentos por foto y `registrar_fallo_analisis_foto`) y `20261115150000_retry_failed_photos.sql` (`reintentar_fotos_no_analizadas`, para el botón **Reintentar**). Además necesita la Edge Function con su clave de Gemini. La clave se saca gratis en [Google AI Studio](https://aistudio.google.com/apikey):
 
