@@ -21,7 +21,8 @@ import 'package:memorylens/features/login/ui/screens/login_screen.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
 import 'package:memorylens/features/memories/ui/screens/memories_screen.dart';
-import 'package:memorylens/features/memories/domain/entities/memory_photo.dart';
+import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_bloc.dart';
+import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_event.dart';
 import 'package:memorylens/features/photo_detail/ui/screens/photo_detail_screen.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_bloc.dart';
 import 'package:memorylens/features/profile/ui/bloc/profile_event.dart';
@@ -108,9 +109,17 @@ class App extends StatelessWidget {
             ],
             child: const AnalyzingScreen(),
           ),
-          '/foto': (context) => PhotoDetailScreen(
-            photo: ModalRoute.of(context)!.settings.arguments as MemoryPhoto,
-          ),
+          // The id of the photo comes as the argument, from Recuerdos or the
+          // chat (HU-28).
+          '/foto': (context) {
+            final photoId =
+                ModalRoute.of(context)!.settings.arguments as String;
+            return BlocProvider(
+              create: (_) =>
+                  sl<PhotoDetailBloc>()..add(PhotoDetailRequested(photoId)),
+              child: PhotoDetailScreen(photoId: photoId),
+            );
+          },
           '/profile': (_) => BlocProvider(
             create: (_) => sl<ProfileBloc>()..add(ProfileRequested()),
             child: const ProfileScreen(),

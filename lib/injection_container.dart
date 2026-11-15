@@ -1,4 +1,9 @@
 import 'package:get_it/get_it.dart';
+import 'package:memorylens/features/photo_detail/data/repository/photo_detail_repository_impl.dart';
+import 'package:memorylens/features/photo_detail/data/source/supabase_photo_detail_data_source.dart';
+import 'package:memorylens/features/photo_detail/domain/repository/photo_detail_repository.dart';
+import 'package:memorylens/features/photo_detail/domain/usecases/get_photo_detail_usecase.dart';
+import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_bloc.dart';
 import 'package:memorylens/features/auth/data/repository/auth_repository_impl.dart';
 import 'package:memorylens/features/auth/data/repository/interest_repository_impl.dart';
 import 'package:memorylens/features/auth/data/repository/profile_repository_impl.dart';
@@ -79,6 +84,7 @@ void initDependencies() {
   sl.registerLazySingleton(() => SupabaseImportedPhotoDataSource());
   sl.registerLazySingleton(() => SupabaseImportScanDataSource());
   sl.registerLazySingleton(() => SupabasePhotoAnalysisDataSource());
+  sl.registerLazySingleton(() => SupabasePhotoDetailDataSource());
 
   //Repositories
   sl.registerLazySingleton<AuthRepository>(() => AuthRepositoryImpl());
@@ -104,6 +110,9 @@ void initDependencies() {
   sl.registerLazySingleton<PhotoAnalysisRepository>(
     () => PhotoAnalysisRepositoryImpl(),
   );
+  sl.registerLazySingleton<PhotoDetailRepository>(
+    () => PhotoDetailRepositoryImpl(),
+  );
 
   //Use cases
   sl.registerLazySingleton(() => GetInterestsUseCase());
@@ -126,6 +135,7 @@ void initDependencies() {
   sl.registerLazySingleton(() => RetryFailedPhotosUseCase());
   sl.registerLazySingleton(() => CountNewPhotosUseCase());
   sl.registerLazySingleton(() => ImportNewPhotosUseCase());
+  sl.registerLazySingleton(() => GetPhotoDetailUseCase());
 
   //Observers
   sl.registerLazySingleton(() => ScreenTracker());
@@ -141,4 +151,5 @@ void initDependencies() {
   sl.registerFactory(() => MemoriesBloc());
   sl.registerFactory(() => GalleryImportBloc());
   sl.registerFactory(() => PhotoAnalysisBloc());
+  sl.registerFactory(() => PhotoDetailBloc());
 }

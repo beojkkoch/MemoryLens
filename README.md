@@ -72,7 +72,7 @@ Es la pantalla principal. Arriba a la derecha el icono de persona abre **Mi perf
   - Las miniaturas salen del bucket privado con URLs firmadas que duran 24 h. Cada página firma solo sus propias fotos, en una sola llamada.
   - **Carga por partes (HU-15):** al abrir Recuerdos solo llegan las 60 fotos más recientes (`GetMemoriesUseCase.pageSize`), junto con el total y el conteo de analizadas, pedidos en paralelo. A unos 800 px del final se pide la página siguiente sin frenar el desplazamiento, y mientras llega se ve un indicador al final. Solo se construyen las miniaturas cercanas a la pantalla, y siempre son miniaturas de 400 px, nunca la foto original. Si una página falla, lo ya cargado se queda y el siguiente desplazamiento vuelve a intentarlo. Cuando termina el análisis de fotos nuevas (HU-11) se piden las fotos analizadas en esa corrida (por `foto.analizada_en`, con una hora de margen por si el reloj del teléfono no coincide con el del servidor) que caen dentro de lo ya cargado, y cada una aparece bajo su día aunque se haya tomado hace años. Las más antiguas que lo cargado llegan con las páginas siguientes. No se pierde nada de lo cargado, así la cuadrícula no salta al inicio.
   - Mientras carga se ven cuadros grises. Si la carga falla aparece **Reintentar**, y una miniatura que no carga se ve como un cuadro gris con un ícono de imagen.
-  - Cada miniatura se anuncia como *«Abrir [título]»*. Al tocarla se abre el detalle (`/foto`), y al volver la cuadrícula sigue en la misma posición. Por ahora el detalle muestra la imagen, el título y la fecha; el resto llega con HU-28.
+  - Cada miniatura se anuncia como *«Abrir [título]»*. Al tocarla se abre el **Detalle de foto** (`/foto`, con el id de la foto como argumento), y al volver la cuadrícula sigue en la misma posición.
   - Si no hay ninguna foto analizada no se muestra una cuadrícula vacía sino la galería vacía.
 - **Conectar la galería** necesita dos permisos, y sin ambos la app no lee ninguna foto:
   1. Ventana propia *«Memory Lens quiere acceder a tus fotos»* con **No permitir** y **Permitir**. **No permitir** la cierra y deja todo como estaba: la app no vuelve a preguntar por su cuenta.
@@ -108,7 +108,17 @@ Las fotos originales del teléfono solo se leen: nada del feature puede modifica
 
 La clave de la IA nunca está en la app. La Edge Function `analizar-fotos` (`supabase/functions/analizar-fotos`) recibe hasta 4 ids, baja las fotos del bucket con el token de la persona (la RLS aplica), llama a Gemini y guarda todo con la función SQL `guardar_analisis_foto`. Plan gratuito de Google AI Studio: Google puede usar lo que se envía para mejorar sus productos.
 
-### 7. Mi perfil
+### 7. Detalle de foto
+
+Se abre desde Recuerdos, y más adelante desde el chat, con el id de la foto (HU-28):
+
+- Arriba, la foto en grande ocupa cerca del 70 % de la pantalla y un degradado la une al panel de abajo. Es la copia grande del bucket (hasta 2560 px), firmada solo al abrir el detalle y con validez de 1 h; nunca la miniatura. La foto se ve completa, sin recortar, para que una factura se pueda leer entera.
+- El panel muestra *«ANÁLISIS DE IA»*, el título con un ícono de etiqueta y la descripción que escribió la IA (`foto.texto_alt`).
+- Debajo, en dos columnas: **Fecha** (*«14 jun 2024, 10:27»*), **Categoría**, **Tipo de compra** y **Monto total** (con el formato de su moneda). Se muestra lo que está guardado en la foto, sea de la IA o corregido por la persona, y *«—»* donde no hay dato. Nada de esto se puede editar aquí.
+- El botón de volver, arriba a la izquierda, regresa a la pantalla anterior.
+- Si la foto no existe o es de otra persona (la RLS no la deja ver), aparece *«Foto no encontrada»* con **Volver**. Si la carga falla, el mensaje trae **Reintentar**.
+
+### 8. Mi perfil
 
 Muestra tu nombre, profesión, ciudad, correo e intereses. **Cerrar sesión** te devuelve a la bienvenida.
 

@@ -149,7 +149,7 @@ class _MemoriesScreenState extends State<MemoriesScreen>
                       onOpen: (photo) => Navigator.pushNamed(
                         context,
                         '/foto',
-                        arguments: photo,
+                        arguments: photo.id,
                       ),
                     ),
             ),

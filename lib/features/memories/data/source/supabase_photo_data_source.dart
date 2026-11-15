@@ -38,7 +38,7 @@ class SupabasePhotoDataSource {
   }
 
   /// One page of the photos the AI already described, newest first, with
-  /// signed links to the image and its thumbnail (HU-15). Only the photos of
+  /// signed links to their thumbnails (HU-15). Only the photos of
   /// the page are signed.
   Future<List<MemoryPhoto>> analyzed({
     required int offset,
@@ -82,15 +82,12 @@ class SupabasePhotoDataSource {
     }
   }
 
-  /// Signs every image and thumbnail of a page in one call. A file that
-  /// cannot be signed gets no link, and the screen shows a gray box for it.
+  /// Signs every thumbnail of a page in one call; the large image is signed
+  /// only when its detail opens (HU-28). A file that cannot be signed gets no
+  /// link, and the screen shows a gray box for it.
   Future<List<MemoryPhoto>> _withLinks(List<Map<String, dynamic>> rows) async {
     if (rows.isEmpty) return const [];
-    final paths = <String>{};
-    for (final row in rows) {
-      paths.add(row['url_imagen'] as String);
-      paths.add(_thumbnailPath(row));
-    }
+    final paths = {for (final row in rows) _thumbnailPath(row)};
     final results = await _client.storage
         .from(bucket)
         .createSignedUrlsResult(paths.toList(), signedUrlLifetime.inSeconds);
@@ -105,7 +102,6 @@ class SupabasePhotoDataSource {
           title: row['titulo'] as String?,
           takenAt: _date(row['fecha_captura']),
           thumbnailUrl: links[_thumbnailPath(row)],
-          imageUrl: links[row['url_imagen']],
         ),
     ];
   }
