@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +13,7 @@ import 'package:memorylens/features/gallery_access/domain/usecases/open_gallery_
 import 'package:memorylens/features/gallery_access/domain/usecases/request_gallery_access_usecase.dart';
 import 'package:memorylens/features/memories/domain/entities/memory_photo.dart';
 import 'package:memorylens/features/memories/domain/repository/photo_repository.dart';
+import 'package:memorylens/features/memories/domain/usecases/count_analyzed_photos_usecase.dart';
 import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
 import 'package:memorylens/features/memories/domain/usecases/get_memories_usecase.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
@@ -47,6 +50,7 @@ void main() {
     sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
     sl.registerLazySingleton(() => CountPhotosUseCase());
     sl.registerLazySingleton(() => GetMemoriesUseCase());
+    sl.registerLazySingleton(() => CountAnalyzedPhotosUseCase());
     sl.registerFactory(() => MemoriesBloc());
     // Analizando imports the photos, and Recuerdos asks if an import is
     // pending, so both need the import fakes.
@@ -538,6 +542,62 @@ void main() {
       // The test environment answers every request with an error.
       expect(find.byIcon(Icons.image_outlined), findsNWidgets(2));
       expect(find.byType(MemoryTile), findsNWidgets(2));
+    });
+  });
+
+  group('more photos while scrolling (HU-15)', () {
+    const pageSize = GetMemoriesUseCase.pageSize;
+
+    setUp(() {
+      photos.photoCount = 1000;
+      photos.analyzedPhotos = manyPhotos(1000);
+    });
+
+    Future<void> scrollToEnd(WidgetTester tester) async {
+      await tester.fling(
+        find.byType(CustomScrollView),
+        const Offset(0, -5000),
+        5000,
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+    }
+
+    testWidgets('the total counts every analyzed photo, not only the loaded '
+        'ones', (tester) async {
+      await pumpMemories(tester);
+
+      expect(find.text('1000 fotos'), findsOneWidget);
+      expect(photos.pageOffsets, [0]);
+    });
+
+    testWidgets('only the tiles close to the screen are built (CA4)', (
+      tester,
+    ) async {
+      await pumpMemories(tester);
+
+      expect(find.byType(MemoryTile).evaluate().length, lessThan(pageSize));
+    });
+
+    testWidgets('close to the end the next page loads with an indicator '
+        '(CA2, CA3)', (tester) async {
+      await pumpMemories(tester);
+      photos.nextPageGate = Completer<void>();
+
+      await scrollToEnd(tester);
+
+      expect(find.bySemanticsLabel('Cargando más fotos'), findsOneWidget);
+      expect(photos.pageOffsets, [0, pageSize]);
+
+      photos.nextPageGate!.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.bySemanticsLabel('Cargando más fotos'), findsNothing);
+      // The person can keep scrolling into the new page.
+      await scrollToEnd(tester);
+      await tester.pumpAndSettle();
+      // The fling keeps going, page after page.
+      expect(photos.pageOffsets.take(3), [0, pageSize, 2 * pageSize]);
     });
   });
 }
