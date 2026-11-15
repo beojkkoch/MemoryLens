@@ -24,6 +24,7 @@ import 'package:memorylens/features/login/ui/bloc/login_bloc.dart';
 import 'package:memorylens/features/login/ui/screens/login_screen.dart';
 import 'package:memorylens/features/memories/domain/repository/photo_repository.dart';
 import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
+import 'package:memorylens/features/memories/domain/usecases/get_memories_usecase.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
 import 'package:memorylens/features/memories/ui/screens/memories_screen.dart';
@@ -154,6 +155,7 @@ void main() {
     sl.registerLazySingleton(() => CheckGalleryAccessUseCase());
     sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
     sl.registerLazySingleton(() => CountPhotosUseCase());
+    sl.registerLazySingleton(() => GetMemoriesUseCase());
     sl.registerFactory(() => MemoriesBloc());
     // Recuerdos leads to Analizando, which imports the photos.
     registerGalleryImportFakes();

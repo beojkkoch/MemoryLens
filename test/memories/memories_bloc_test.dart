@@ -8,6 +8,7 @@ import 'package:memorylens/features/gallery_access/domain/usecases/open_gallery_
 import 'package:memorylens/features/gallery_access/domain/usecases/request_gallery_access_usecase.dart';
 import 'package:memorylens/features/memories/domain/repository/photo_repository.dart';
 import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
+import 'package:memorylens/features/memories/domain/usecases/get_memories_usecase.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_state.dart';
@@ -33,6 +34,7 @@ void main() {
     sl.registerLazySingleton(() => CheckGalleryAccessUseCase());
     sl.registerLazySingleton(() => OpenGallerySettingsUseCase());
     sl.registerLazySingleton(() => CountPhotosUseCase());
+    sl.registerLazySingleton(() => GetMemoriesUseCase());
     // Recuerdos asks whether an import was left half done.
     importFakes = registerGalleryImportFakes();
     bloc = MemoriesBloc();
@@ -70,6 +72,25 @@ void main() {
       expect(bloc.state.status, MemoriesStatus.ready);
       expect(bloc.state.photoCount, 12);
       expect(bloc.state.hasPhotos, isTrue);
+    });
+
+    test('loads the analyzed photos grouped by day (HU-12)', () async {
+      photos.photoCount = 3;
+      photos.analyzedPhotos = [
+        memoryPhoto('a', takenAt: DateTime(2024, 6, 14)),
+        memoryPhoto('b', takenAt: DateTime(2024, 6, 15, 9)),
+        memoryPhoto('c', takenAt: DateTime(2024, 6, 15, 18)),
+      ];
+
+      await send([MemoriesStarted()]);
+
+      expect(bloc.state.status, MemoriesStatus.ready);
+      expect(bloc.state.analyzedCount, 3);
+      expect(bloc.state.newestTakenAt, DateTime(2024, 6, 15, 18));
+      expect(bloc.state.groups.map((g) => g.day), [
+        DateTime(2024, 6, 15),
+        DateTime(2024, 6, 14),
+      ]);
     });
 
     test('a failed count shows the reason and can be retried', () async {
@@ -288,6 +309,24 @@ void main() {
       // It stays in Recuerdos: no Analizando in between.
       expect(state.access, GalleryAccess.idle);
     });
+
+    test(
+      'the timeline is read again after the analysis (HU-12, CA6)',
+      () async {
+        connectedWith(onDevice: 3);
+        photos.analyzedPhotos = [memoryPhoto('p0'), memoryPhoto('p1')];
+        photos.laterAnalyzed.add([
+          memoryPhoto('p0'),
+          memoryPhoto('p1'),
+          memoryPhoto('p2'),
+        ]);
+
+        bloc.add(MemoriesStarted());
+        final state = await until((s) => s.newPhotosAnalyzed > 0);
+
+        expect(state.analyzedCount, 3);
+      },
+    );
 
     test('N counts only the photos really analyzed', () async {
       connectedWith(onDevice: 4);

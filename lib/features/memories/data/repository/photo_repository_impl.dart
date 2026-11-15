@@ -1,4 +1,5 @@
 import 'package:memorylens/features/memories/data/source/supabase_photo_data_source.dart';
+import 'package:memorylens/features/memories/domain/entities/memory_photo.dart';
 import 'package:memorylens/features/memories/domain/repository/photo_repository.dart';
 import 'package:memorylens/injection_container.dart';
 
@@ -8,5 +9,10 @@ class PhotoRepositoryImpl implements PhotoRepository {
   @override
   Future<int> count() {
     return _dataSource.count();
+  }
+
+  @override
+  Future<List<MemoryPhoto>> analyzed() {
+    return _dataSource.analyzed();
   }
 }
