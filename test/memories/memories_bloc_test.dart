@@ -115,6 +115,18 @@ void main() {
       expect(bloc.state.access, GalleryAccess.idle);
     });
 
+    test('an analysis left half done also goes on to Analizando', () async {
+      photos.photoCount = 3;
+      importFakes.scans.pending = false;
+      // Imported, but the AI has not described it yet.
+      importFakes.photos.imported.add('p0');
+      permission.checkResult = GalleryPermissionStatus.granted;
+
+      await send([MemoriesStarted()]);
+
+      expect(bloc.state.access, GalleryAccess.granted);
+    });
+
     test('does not move on when nothing is pending', () async {
       permission.checkResult = GalleryPermissionStatus.granted;
 

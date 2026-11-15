@@ -51,6 +51,9 @@ class ExceptionMapper {
     if (error is StorageException) {
       return _mapStorage(error);
     }
+    if (error is FunctionException) {
+      return _mapFunction(error);
+    }
     if (error is AuthException) {
       return AppException(
         _serverMessage,
@@ -61,6 +64,29 @@ class ExceptionMapper {
     return AppException(
       AppException.genericMessage,
       kind: AppErrorKind.unknown,
+      cause: error,
+    );
+  }
+
+  /// An Edge Function that could not be reached has status 0.
+  static AppException _mapFunction(FunctionException error) {
+    if (error is FunctionsFetchException || error.status == 0) {
+      return AppException(
+        _networkMessage,
+        kind: AppErrorKind.network,
+        cause: error,
+      );
+    }
+    if (error.status == 408 || error.status == 504) {
+      return AppException(
+        _timeoutMessage,
+        kind: AppErrorKind.timeout,
+        cause: error,
+      );
+    }
+    return AppException(
+      _serverMessage,
+      kind: AppErrorKind.server,
       cause: error,
     );
   }

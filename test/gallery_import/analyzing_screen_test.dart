@@ -109,6 +109,55 @@ void main() {
     expect(find.text('Memory Lens no tiene acceso a tus fotos.'), findsNothing);
   });
 
+  testWidgets('after the import the AI describes the photos', (tester) async {
+    fakes.gallery.photos = devicePhotos(2);
+    fakes.analysis.gate = Completer<void>();
+    addTearDown(() => fakes.analysis.gate!.complete());
+
+    await pumpAnalyzing(tester);
+
+    expect(fakes.photos.imported, {'p0', 'p1'});
+    expect(find.text('Estamos organizando tus recuerdos'), findsOneWidget);
+    expect(find.text('Ver recuerdos'), findsNothing);
+  });
+
+  testWidgets('a failed analysis keeps the import and «Reintentar» recovers', (
+    tester,
+  ) async {
+    fakes.gallery.photos = devicePhotos(2);
+    fakes.analysis.backlogError = const AppException(
+      'Tuvimos un problema de nuestro lado.',
+      kind: AppErrorKind.server,
+    );
+
+    await pumpAnalyzing(tester);
+
+    expect(find.text('Tuvimos un problema de nuestro lado.'), findsOneWidget);
+    fakes.analysis.backlogError = null;
+    final uploadsBefore = Map.of(fakes.photos.uploadCounts);
+    await tester.tap(find.text('Reintentar'));
+    await settle(tester);
+
+    expect(find.text('Listo'), findsOneWidget);
+    // Retrying the analysis does not import the photos again.
+    expect(fakes.photos.uploadCounts, uploadsBefore);
+  });
+
+  testWidgets('says how many photos could not be analyzed', (tester) async {
+    fakes.gallery.photos = devicePhotos(3);
+    fakes.analysis.blocked.addAll({'p0', 'p2'});
+
+    await pumpAnalyzing(tester);
+
+    expect(find.text('Listo'), findsOneWidget);
+    expect(
+      find.text(
+        'Tus fotos ya están en Memory Lens. 2 no se pudieron analizar.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('when it is over it says «Listo» and leads to Recuerdos', (
     tester,
   ) async {
@@ -117,6 +166,11 @@ void main() {
     await pumpAnalyzing(tester);
 
     expect(find.text('Listo'), findsOneWidget);
+    expect(
+      find.text('Tus fotos ya están organizadas en Memory Lens.'),
+      findsOneWidget,
+    );
+    expect(fakes.analysis.done.keys.toSet(), {'p0', 'p1', 'p2'});
     expect(find.byType(CircularProgressIndicator), findsNothing);
 
     await tester.tap(find.text('Ver recuerdos'));

@@ -86,9 +86,17 @@ Importa las fotos de la galería a tu espacio en Memory Lens (HU-07):
 - **No resube** las que ya están: la fila en `foto` (con su `asset_id`) marca la foto como importada, y cada corrida solo toma las que faltan.
 - **Sin conexión:** muestra *«Esperando conexión»* y sigue sola donde quedó cuando vuelve la red. Si tras varios intentos seguidos no entra ninguna foto (por ejemplo, wifi sin internet) muestra el error con **Reintentar**.
 - **Fotos que no se pueden leer** (borradas durante la importación, o en la nube sin descargar) se omiten y no detienen al resto.
+- **Después la IA describe cada foto** (HU-08), con el mensaje *«Estamos organizando tus recuerdos»*. Gemini escribe en español un **título**, una **categoría** del catálogo (Factura, Comida, Lugar, Viaje, Mascotas, Personas, Arte, Trabajo), entre 3 y 8 **etiquetas** y una descripción corta (`foto.texto_alt`). Las etiquetas entran a `foto_etiqueta` con `confirmada = false`.
+- **Embeddings para la búsqueda (HU-21):** cada foto guarda dos vectores de 768 dimensiones de `gemini-embedding-2`, uno de la imagen (`embedding_imagen`) y otro de su texto (`embedding_texto`). Los dos están en el mismo espacio, así que una consulta en texto se compara con ambos.
+- **No se paga dos veces:** `foto.estado_analisis` (`pendiente`, `listo`, `error`) marca lo que ya se hizo. Cada corrida solo envía las pendientes, 4 por llamada y 2 llamadas a la vez (128 fotos son 32 llamadas, unos 3 a 4 minutos).
+- **Límite del plan gratuito:** si Gemini pide esperar, la app espera lo que indica y repite la llamada, hasta 4 veces. Si sigue ocupado, muestra el error con **Reintentar**. Sin conexión hace lo mismo que la importación: *«Esperando conexión»* y sigue sola.
+- **Fotos que la IA no puede describir** (bloqueadas por sus filtros o ilegibles) quedan en `error`, no se reintentan y no frenan al resto. *«Listo»* dice cuántas fueron.
+- **A medias:** si la app se cierra durante el análisis, Recuerdos vuelve sola a **Analizando** igual que con una importación pendiente.
 - **Al terminar** dice *«Listo»* y ofrece **Ver recuerdos**. La barra de progreso con los números llega con su propia historia.
 
-Las fotos originales del teléfono solo se leen: nada del feature puede modificarlas ni borrarlas, y un test lo vigila. El análisis de las fotos llega con otra historia.
+Las fotos originales del teléfono solo se leen: nada del feature puede modificarlas ni borrarlas, y un test lo vigila.
+
+La clave de la IA nunca está en la app. La Edge Function `analizar-fotos` (`supabase/functions/analizar-fotos`) recibe hasta 4 ids, baja las fotos del bucket con el token de la persona (la RLS aplica), llama a Gemini y guarda todo con la función SQL `guardar_analisis_foto`. Plan gratuito de Google AI Studio: Google puede usar lo que se envía para mejorar sus productos.
 
 ### 7. Mi perfil
 
@@ -113,6 +121,16 @@ npx supabase db push
 ```
 
 La importación de fotos necesita la migración `20261114120000_import_gallery_photos.sql` (bucket `fotos`, políticas de Storage y columnas nuevas): corre `npx supabase db push` antes de probar **Analizando**.
+
+El análisis con IA necesita la migración `20261115120000_analyze_photos.sql` (pgvector, `estado_analisis`, embeddings y las funciones `guardar_analisis_foto` y `marcar_error_analisis_foto`) y la Edge Function con su clave de Gemini. La clave se saca gratis en [Google AI Studio](https://aistudio.google.com/apikey):
+
+```bash
+npx supabase db push
+npx supabase secrets set GEMINI_API_KEY=<tu-clave>
+npx supabase functions deploy analizar-fotos
+```
+
+El modelo por defecto es `gemini-3.8-flash`. Para cambiarlo sin tocar código: `npx supabase secrets set GEMINI_MODEL=<modelo>`. Los límites del plan gratuito se ven en AI Studio.
 
 El registro necesita que **Confirm email** esté encendido (Dashboard › Authentication › Sign In / Providers › Email), igual que `enable_confirmations = true` en `supabase/config.toml`. Los datos del formulario viajan como metadatos de la cuenta, y el trigger `crear_perfil_al_confirmar` guarda el perfil y los intereses cuando se confirma el correo.
 

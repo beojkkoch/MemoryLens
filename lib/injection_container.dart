@@ -41,6 +41,12 @@ import 'package:memorylens/features/gallery_import/domain/usecases/has_pending_i
 import 'package:memorylens/features/gallery_import/domain/usecases/import_gallery_photos_usecase.dart';
 import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_bloc.dart';
 import 'package:memorylens/features/memories/data/repository/photo_repository_impl.dart';
+import 'package:memorylens/features/photo_analysis/data/repository/photo_analysis_repository_impl.dart';
+import 'package:memorylens/features/photo_analysis/data/source/supabase_photo_analysis_data_source.dart';
+import 'package:memorylens/features/photo_analysis/domain/repository/photo_analysis_repository.dart';
+import 'package:memorylens/features/photo_analysis/domain/usecases/analyze_pending_photos_usecase.dart';
+import 'package:memorylens/features/photo_analysis/domain/usecases/has_pending_analysis_usecase.dart';
+import 'package:memorylens/features/photo_analysis/ui/bloc/photo_analysis_bloc.dart';
 import 'package:memorylens/features/memories/data/source/supabase_photo_data_source.dart';
 import 'package:memorylens/features/memories/domain/repository/photo_repository.dart';
 import 'package:memorylens/features/memories/domain/usecases/count_photos_usecase.dart';
@@ -67,6 +73,7 @@ void initDependencies() {
   sl.registerLazySingleton(() => SupabasePhotoStorageDataSource());
   sl.registerLazySingleton(() => SupabaseImportedPhotoDataSource());
   sl.registerLazySingleton(() => SupabaseImportScanDataSource());
+  sl.registerLazySingleton(() => SupabasePhotoAnalysisDataSource());
 
   //Repositories
   sl.registerLazySingleton<AuthRepository>(() => AuthRepositoryImpl());
@@ -89,6 +96,9 @@ void initDependencies() {
   sl.registerLazySingleton<ImportScanRepository>(
     () => ImportScanRepositoryImpl(),
   );
+  sl.registerLazySingleton<PhotoAnalysisRepository>(
+    () => PhotoAnalysisRepositoryImpl(),
+  );
 
   //Use cases
   sl.registerLazySingleton(() => GetInterestsUseCase());
@@ -104,6 +114,8 @@ void initDependencies() {
   sl.registerLazySingleton(() => CountPhotosUseCase());
   sl.registerLazySingleton(() => ImportGalleryPhotosUseCase());
   sl.registerLazySingleton(() => HasPendingImportUseCase());
+  sl.registerLazySingleton(() => AnalyzePendingPhotosUseCase());
+  sl.registerLazySingleton(() => HasPendingAnalysisUseCase());
 
   //Observers
   sl.registerLazySingleton(() => ScreenTracker());
@@ -118,4 +130,5 @@ void initDependencies() {
   sl.registerFactory(() => ConnectivityBloc());
   sl.registerFactory(() => MemoriesBloc());
   sl.registerFactory(() => GalleryImportBloc());
+  sl.registerFactory(() => PhotoAnalysisBloc());
 }
