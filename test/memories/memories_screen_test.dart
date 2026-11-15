@@ -20,11 +20,16 @@ import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
 import 'package:memorylens/features/memories/ui/screens/memories_screen.dart';
 import 'package:memorylens/features/memories/ui/widgets/memories_grid.dart';
+import 'package:memorylens/features/photo_detail/domain/repository/photo_detail_repository.dart';
+import 'package:memorylens/features/photo_detail/domain/usecases/get_photo_detail_usecase.dart';
+import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_bloc.dart';
+import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_event.dart';
 import 'package:memorylens/features/photo_detail/ui/screens/photo_detail_screen.dart';
 import 'package:memorylens/injection_container.dart';
 
 import '../gallery_access/fake_gallery_permission_repository.dart';
 import '../gallery_import/gallery_import_test_setup.dart';
+import '../photo_detail/fake_photo_detail_repository.dart';
 import 'fake_photo_repository.dart';
 
 void main() {
@@ -52,6 +57,12 @@ void main() {
     sl.registerLazySingleton(() => GetMemoriesUseCase());
     sl.registerLazySingleton(() => CountAnalyzedPhotosUseCase());
     sl.registerFactory(() => MemoriesBloc());
+    // A photo opens its detail (HU-28).
+    sl.registerSingleton<PhotoDetailRepository>(
+      FakePhotoDetailRepository()..answerEveryId = true,
+    );
+    sl.registerLazySingleton(() => GetPhotoDetailUseCase());
+    sl.registerFactory(() => PhotoDetailBloc());
     // Analizando imports the photos, and Recuerdos asks if an import is
     // pending, so both need the import fakes.
     importFakes = registerGalleryImportFakes();
@@ -70,9 +81,14 @@ void main() {
             child: const MemoriesScreen(),
           ),
           '/analizando': (_) => analyzingRoute(),
-          '/foto': (context) => PhotoDetailScreen(
-            photo: ModalRoute.of(context)!.settings.arguments as MemoryPhoto,
-          ),
+          '/foto': (context) {
+            final id = ModalRoute.of(context)!.settings.arguments as String;
+            return BlocProvider(
+              create: (_) =>
+                  sl<PhotoDetailBloc>()..add(PhotoDetailRequested(id)),
+              child: PhotoDetailScreen(photoId: id),
+            );
+          },
         },
       ),
     );
@@ -463,7 +479,6 @@ void main() {
           for (var i = 0; i < 60; i++)
             memoryPhoto(
               'p$i',
-              title: 'Foto $i',
               takenAt: DateTime(2024, 6, 1).subtract(Duration(days: i ~/ 3)),
             ),
         ]);
