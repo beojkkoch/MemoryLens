@@ -12,12 +12,14 @@ void main() {
         'resultados': [
           {'foto_id': 'a', 'estado': 'listo'},
           {'foto_id': 'b', 'estado': 'error'},
+          {'foto_id': 'c', 'estado': 'reintentar'},
         ],
       });
 
       expect(results, {
         'a': PhotoAnalysisOutcome.analyzed,
         'b': PhotoAnalysisOutcome.failed,
+        'c': PhotoAnalysisOutcome.retry,
       });
     });
 

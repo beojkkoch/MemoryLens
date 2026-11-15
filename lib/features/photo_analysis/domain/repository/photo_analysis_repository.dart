@@ -18,4 +18,8 @@ abstract class PhotoAnalysisRepository {
   ///
   /// Throws AnalysisBusyException when the AI asks to wait.
   Future<Map<String, PhotoAnalysisOutcome>> analyze(List<String> photoIds);
+
+  /// Marks the photos as «No analizada», for when every attempt to analyze
+  /// them failed. Photos already analyzed are left as they are.
+  Future<void> markFailed(List<String> photoIds);
 }

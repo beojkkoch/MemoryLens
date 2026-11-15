@@ -1,8 +1,11 @@
 // HU-08: analiza hasta 4 fotos importadas por llamada. Para cada una Gemini escribe título,
 // categoría, etiquetas y descripción en español, y se guardan con sus embeddings.
+// HU-09: en la misma llamada, si la foto es una Factura, lee tipo de compra, monto y moneda.
 //
 // Cuerpo: { "foto_ids": ["uuid", ...] }
-// Respuesta 200: { "resultados": [{ "foto_id": "...", "estado": "listo" | "error" }] }
+// Respuesta 200: { "resultados": [{ "foto_id": "...", "estado": "listo" | "reintentar" | "error" }] }
+//   "reintentar": la IA no pudo con la foto, pero le quedan intentos (HU-10: hasta 3).
+//   "error": «No analizada», ya no se reintenta.
 // Respuesta 429: { "error": "ocupado", "reintentar_en": 30 }  (límite del plan gratuito)
 // Respuesta 503: { "error": "no_disponible" }                  (reintentar más tarde)
 //
@@ -11,6 +14,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 import {
+  type Contexto,
   type Descripcion,
   describir,
   embeddings,
@@ -34,7 +38,7 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-type Estado = "listo" | "error";
+type Estado = "listo" | "reintentar" | "error";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -99,6 +103,8 @@ async function analizar(supabase: SupabaseClient, ids: string[]) {
     }
   }
 
+  const contexto = await leerContexto(supabase);
+
   const fotos: FotoParaAnalizar[] = [];
   const tamanos = new Map<string, number>();
   for (const p of pendientes) {
@@ -116,7 +122,7 @@ async function analizar(supabase: SupabaseClient, ids: string[]) {
   }
 
   for (const grupo of agrupar(fotos, tamanos)) {
-    const descritas = await describirConRespaldo(grupo);
+    const descritas = await describirConRespaldo(grupo, contexto);
     const porId = new Map(grupo.map((f) => [f.id, f]));
 
     const vectores = descritas.length === 0 ? [] : await embeddings(
@@ -132,12 +138,15 @@ async function analizar(supabase: SupabaseClient, ids: string[]) {
         p_etiquetas: d.etiquetas,
         p_embedding_imagen: vector(vectores[i].imagen),
         p_embedding_texto: vector(vectores[i].texto),
+        p_tipo_compra: d.factura?.tipoCompra ?? null,
+        p_monto: d.factura?.monto ?? null,
+        p_moneda: d.factura?.moneda ?? null,
       });
       if (error) throw error;
       resultados.set(d.id, "listo");
     }
     for (const f of grupo) {
-      if (!resultados.has(f.id)) await marcarError(supabase, f.id, resultados);
+      if (!resultados.has(f.id)) await registrarFallo(supabase, f.id, resultados);
     }
   }
 
@@ -148,10 +157,13 @@ async function analizar(supabase: SupabaseClient, ids: string[]) {
  * Si Gemini bloquea o se salta alguna foto de un grupo, las que faltan se piden de a una:
  * así una sola foto problemática no deja sin análisis a las demás.
  */
-async function describirConRespaldo(grupo: FotoParaAnalizar[]): Promise<Descripcion[]> {
+async function describirConRespaldo(
+  grupo: FotoParaAnalizar[],
+  contexto: Contexto,
+): Promise<Descripcion[]> {
   let descritas: Descripcion[] = [];
   try {
-    descritas = await describir(grupo);
+    descritas = await describir(grupo, contexto);
   } catch (e) {
     if (!(e instanceof GeminiBloqueado)) throw e;
     if (grupo.length === 1) return [];
@@ -161,12 +173,24 @@ async function describirConRespaldo(grupo: FotoParaAnalizar[]): Promise<Descripc
   const hechas = new Set(descritas.map((d) => d.id));
   for (const foto of grupo.filter((f) => !hechas.has(f.id))) {
     try {
-      descritas.push(...await describir([foto]));
+      descritas.push(...await describir([foto], contexto));
     } catch (e) {
       if (!(e instanceof GeminiBloqueado)) throw e;
     }
   }
   return descritas;
+}
+
+/** La ciudad del perfil. Si no se puede leer, se analiza igual, solo que sin esa pista. */
+async function leerContexto(supabase: SupabaseClient): Promise<Contexto> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return {};
+  const { data } = await supabase
+    .from("usuario")
+    .select("ciudad")
+    .eq("id", user.id)
+    .maybeSingle();
+  return { ciudad: data?.ciudad ?? undefined };
 }
 
 /** Junta las fotos en pedidos que no pasen el límite de tamaño de Gemini. */
@@ -188,6 +212,20 @@ function agrupar(fotos: FotoParaAnalizar[], tamanos: Map<string, number>) {
   return grupos;
 }
 
+/** Cuenta un intento fallido: la foto vuelve a la cola hasta agotar sus 3 intentos. */
+async function registrarFallo(
+  supabase: SupabaseClient,
+  id: string,
+  resultados: Map<string, Estado>,
+) {
+  const { data, error } = await supabase.rpc("registrar_fallo_analisis_foto", {
+    p_foto_id: id,
+  });
+  if (error) throw error;
+  resultados.set(id, data === "pendiente" ? "reintentar" : data === "listo" ? "listo" : "error");
+}
+
+/** Para fallas que no se arreglan reintentando, como una foto que ya no está en el bucket. */
 async function marcarError(
   supabase: SupabaseClient,
   id: string,

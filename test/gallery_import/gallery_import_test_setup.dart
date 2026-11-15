@@ -44,8 +44,8 @@ class GalleryImportFakes {
   final FakeNetworkRepository network;
   late final FakePhotoAnalysisRepository analysis;
 
-  /// How long the analysis was asked to wait by the AI, in order.
-  final List<Duration> busyWaits = [];
+  /// Every pause of the analysis (asked by the AI or before a retry), in order.
+  final List<Duration> waits = [];
 }
 
 /// Registers the fakes and the real use cases of the import and the analysis
@@ -63,7 +63,7 @@ GalleryImportFakes registerGalleryImportFakes() {
   sl.registerSingleton<PhotoAnalysisRepository>(fakes.analysis);
   sl.registerLazySingleton(
     () => AnalyzePendingPhotosUseCase(
-      wait: (delay) async => fakes.busyWaits.add(delay),
+      wait: (delay) async => fakes.waits.add(delay),
     ),
   );
   sl.registerLazySingleton(() => HasPendingAnalysisUseCase());

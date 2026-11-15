@@ -42,15 +42,23 @@ void main() {
     expect(analysis.done.keys.toSet(), photos(10).toSet());
   });
 
-  test('128 photos take 32 calls, two at a time (CA6)', () async {
+  test('128 photos take 32 calls (HU-08, CA6)', () async {
     analysis.extraPhotos.addAll(photos(128));
 
     final progress = await analyze().toList();
 
     expect(analysis.calls, hasLength(32));
-    // The first emit plus one per round of two calls.
-    expect(progress, hasLength(1 + 16));
     expect(progress.last.analyzed, 128);
+  });
+
+  test('the progress changes every time a call ends (HU-10, CA2)', () async {
+    analysis.extraPhotos.addAll(photos(10));
+
+    final progress = await analyze().toList();
+
+    // The first emit, then one per call, each with the photos really done.
+    expect(progress.map((p) => p.analyzed), [0, 4, 8, 10]);
+    expect(progress.every((p) => p.total == 10), isTrue);
   });
 
   test('goes on from where it stopped and does not resend photos', () async {
@@ -75,12 +83,47 @@ void main() {
     expect(analysis.calls, isEmpty);
   });
 
+  test('a photo that failed once is tried again (HU-10, CA6)', () async {
+    analysis.extraPhotos.addAll(photos(3));
+    analysis.flaky['f1'] = 2;
+
+    final last = await analyze().last;
+
+    expect(last.analyzed, 3);
+    expect(last.failed, 0);
+    expect(analysis.calls.where((c) => c.contains('f1')), hasLength(3));
+  });
+
+  test('a call that keeps failing marks its photos as «No analizada» and '
+      'the rest goes on', () async {
+    analysis.extraPhotos.addAll(photos(8));
+    const broken = AppException(
+      'Tuvimos un problema.',
+      kind: AppErrorKind.server,
+    );
+    // Every attempt of the call with f0 (f0 to f3) fails.
+    analysis.callErrors['f0'] = broken;
+
+    final last = await analyze().last;
+
+    expect(analysis.markedFailed, ['f0', 'f1', 'f2', 'f3']);
+    expect(analysis.calls.where((c) => c.contains('f0')), hasLength(3));
+    expect(last.failed, 4);
+    expect(last.analyzed, 4);
+    expect(
+      waits.where((w) => w == AnalyzePendingPhotosUseCase.retryPause),
+      hasLength(2),
+    );
+  });
+
   test('a photo the AI cannot describe does not stop the others', () async {
     analysis.extraPhotos.addAll(photos(5));
     analysis.blocked.add('f2');
 
     final last = await analyze().last;
 
+    // It used its 3 attempts before being «No analizada».
+    expect(analysis.attempts['f2'], 3);
     expect(last.analyzed, 4);
     expect(last.failed, 1);
   });

@@ -30,4 +30,9 @@ class PhotoAnalysisRepositoryImpl implements PhotoAnalysisRepository {
   Future<Map<String, PhotoAnalysisOutcome>> analyze(List<String> photoIds) {
     return _dataSource.analyze(photoIds);
   }
+
+  @override
+  Future<void> markFailed(List<String> photoIds) {
+    return _dataSource.markFailed(photoIds);
+  }
 }

@@ -78,6 +78,23 @@ class SupabasePhotoAnalysisDataSource {
     }
   }
 
+  /// Uses the same function the Edge Function uses for a photo that is gone,
+  /// one call per photo, all at the same time.
+  Future<void> markFailed(List<String> photoIds) async {
+    try {
+      await Future.wait(
+        photoIds.map(
+          (id) => _client.rpc(
+            'marcar_error_analisis_foto',
+            params: {'p_foto_id': id},
+          ),
+        ),
+      );
+    } catch (e, stack) {
+      Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
+    }
+  }
+
   /// Reads `{"resultados": [{"foto_id": "...", "estado": "listo"}]}`.
   static Map<String, PhotoAnalysisOutcome> parseResults(Object? data) {
     final results = <String, PhotoAnalysisOutcome>{};
@@ -90,6 +107,8 @@ class SupabasePhotoAnalysisDataSource {
       switch (row['estado']) {
         case 'listo':
           results[id] = PhotoAnalysisOutcome.analyzed;
+        case 'reintentar':
+          results[id] = PhotoAnalysisOutcome.retry;
         case 'error':
           results[id] = PhotoAnalysisOutcome.failed;
       }

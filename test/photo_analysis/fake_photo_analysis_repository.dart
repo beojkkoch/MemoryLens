@@ -5,8 +5,12 @@ import 'package:memorylens/features/photo_analysis/domain/entities/photo_analysi
 import 'package:memorylens/features/photo_analysis/domain/repository/photo_analysis_repository.dart';
 
 /// Behaves like the foto table and the analizar-fotos function: every
-/// imported photo is pending until it is analyzed.
+/// imported photo is pending until it is analyzed, and a photo the AI cannot
+/// describe goes back to the queue until it used its 3 attempts.
 class FakePhotoAnalysisRepository implements PhotoAnalysisRepository {
+  /// Attempts of a photo before the server marks it «No analizada».
+  static const serverAttempts = 3;
+
   /// [_importedIds] gives the ids of the imported photos. By default they are
   /// the ones added to [extraPhotos]; the import fakes pass their own.
   FakePhotoAnalysisRepository({this._importedIds});
@@ -16,19 +20,36 @@ class FakePhotoAnalysisRepository implements PhotoAnalysisRepository {
   /// Imported photos when no [importedIds] was given.
   final List<String> extraPhotos = [];
 
+  /// Photos no longer pending: analyzed or «No analizada».
   final Map<String, PhotoAnalysisOutcome> done = {};
+
+  /// Failed attempts of each photo, like foto.intentos_analisis.
+  final Map<String, int> attempts = {};
 
   /// Every call to [analyze], with its ids.
   final List<List<String>> calls = [];
 
-  /// The AI cannot describe these.
+  /// The AI never manages to describe these.
   final Set<String> blocked = {};
+
+  /// The AI fails these that many times, then describes them.
+  final Map<String, int> flaky = {};
 
   /// Thrown (once each) by the next calls to [analyze], in order.
   final List<Object> nextErrors = [];
 
+  /// Every call with one of these photos throws its error.
+  final Map<String, Object> callErrors = {};
+
+  /// Photos marked «No analizada» by the app with [markFailed].
+  final List<String> markedFailed = [];
+
   /// While set, every call waits for it. Keeps an analysis half done.
   Completer<void>? gate;
+
+  /// Calls before this one do not wait for [gate], so the analysis stops
+  /// part of the way. Null: every call waits.
+  int? gateFromCall;
 
   /// Thrown by [backlog] when set.
   Object? backlogError;
@@ -60,13 +81,34 @@ class FakePhotoAnalysisRepository implements PhotoAnalysisRepository {
       throw StateError('too many photos in one call');
     }
     calls.add(photoIds);
-    await gate?.future;
+    if (calls.length > (gateFromCall ?? 0)) await gate?.future;
     if (nextErrors.isNotEmpty) throw nextErrors.removeAt(0);
-    return {
-      for (final id in photoIds)
-        id: done[id] ??= blocked.contains(id)
-            ? PhotoAnalysisOutcome.failed
-            : PhotoAnalysisOutcome.analyzed,
-    };
+    for (final id in photoIds) {
+      final error = callErrors[id];
+      if (error != null) throw error;
+    }
+    return {for (final id in photoIds) id: _analyzeOne(id)};
+  }
+
+  PhotoAnalysisOutcome _analyzeOne(String id) {
+    final already = done[id];
+    if (already != null) return already;
+
+    final failsLeft = flaky[id] ?? 0;
+    if (!blocked.contains(id) && failsLeft == 0) {
+      return done[id] = PhotoAnalysisOutcome.analyzed;
+    }
+    if (failsLeft > 0) flaky[id] = failsLeft - 1;
+    final tries = attempts[id] = (attempts[id] ?? 0) + 1;
+    if (tries >= serverAttempts) return done[id] = PhotoAnalysisOutcome.failed;
+    return PhotoAnalysisOutcome.retry;
+  }
+
+  @override
+  Future<void> markFailed(List<String> photoIds) async {
+    markedFailed.addAll(photoIds);
+    for (final id in photoIds) {
+      done.putIfAbsent(id, () => PhotoAnalysisOutcome.failed);
+    }
   }
 }
