@@ -67,7 +67,12 @@ Escribe correo y contraseña y toca **Entrar**. Si todo va bien se abre **Recuer
 
 Es la pantalla principal. Arriba a la derecha el icono de persona abre **Mi perfil**.
 
-- **Sin fotos todavía:** muestra *«Sin conectar»*, el contador *«0 fotos»*, *«Aún no tienes recuerdos»* y el botón **Permitir acceso a la galería**. Si la persona ya tiene fotos guardadas, esta invitación no aparece (la grilla de fotos llega con otra historia; por ahora hay un texto de relleno).
+- **Sin fotos todavía:** muestra *«Sin conectar»*, el contador *«0 fotos»*, *«Aún no tienes recuerdos»* y el botón **Permitir acceso a la galería**. Si la persona ya tiene fotos guardadas, esta invitación no aparece.
+- **Línea de tiempo (HU-12):** las fotos ya analizadas se ven en una cuadrícula de 3 columnas con miniaturas cuadradas, agrupadas por el día en que se tomaron (`fecha_captura`, no la fecha de importación): *«Hoy»*, *«Ayer»* y luego fechas como *«15 jun 2024»*, del día más reciente al más antiguo, y dentro de cada día de la más reciente a la más antigua. Las fotos sin fecha van al final en *«Sin fecha»*. Bajo el título *«Recuerdos»* aparece el mes de la foto más reciente (*«Junio 2024»*), y a la derecha el total de fotos analizadas (*«128 fotos»*, *«1 foto»*), que se actualiza cuando termina el análisis de fotos nuevas.
+  - Las miniaturas salen del bucket privado con URLs firmadas que duran 24 h. Se piden todas juntas al abrir Recuerdos, en una llamada por cada 1000 fotos.
+  - Mientras carga se ven cuadros grises. Si la carga falla aparece **Reintentar**, y una miniatura que no carga se ve como un cuadro gris con un ícono de imagen.
+  - Cada miniatura se anuncia como *«Abrir [título]»*. Al tocarla se abre el detalle (`/foto`), y al volver la cuadrícula sigue en la misma posición. Por ahora el detalle muestra la imagen, el título y la fecha; el resto llega con HU-28.
+  - Si no hay ninguna foto analizada no se muestra una cuadrícula vacía sino la galería vacía.
 - **Conectar la galería** necesita dos permisos, y sin ambos la app no lee ninguna foto:
   1. Ventana propia *«Memory Lens quiere acceder a tus fotos»* con **No permitir** y **Permitir**. **No permitir** la cierra y deja todo como estaba: la app no vuelve a preguntar por su cuenta.
   2. Con **Permitir** se pide el permiso del sistema. Si lo concede, se abre **Analizando**.
