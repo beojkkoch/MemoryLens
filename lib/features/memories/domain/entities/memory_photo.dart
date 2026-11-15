@@ -9,17 +9,15 @@ class MemoryPhoto {
   /// know it.
   final DateTime? takenAt;
 
-  /// Signed URLs of the private fotos bucket. Null when the file could not be
-  /// signed, for example because it is no longer in the bucket.
+  /// Signed URL of the thumbnail in the private fotos bucket. Null when the
+  /// file could not be signed, for example because it is no longer there.
   final String? thumbnailUrl;
-  final String? imageUrl;
 
   const MemoryPhoto({
     required this.id,
     this.title,
     this.takenAt,
     this.thumbnailUrl,
-    this.imageUrl,
   });
 
   @override

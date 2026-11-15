@@ -48,4 +48,11 @@ class MemoryDates {
   static String monthLabel(DateTime date) {
     return '${_months[date.month - 1]} ${date.year}';
   }
+
+  /// «14 jun 2024, 10:27», for the detail of a photo (HU-28, CA7).
+  static String dateTimeLabel(DateTime date) {
+    String twoDigits(int value) => value.toString().padLeft(2, '0');
+    return '${date.day} ${_shortMonths[date.month - 1]} ${date.year}, '
+        '${twoDigits(date.hour)}:${twoDigits(date.minute)}';
+  }
 }
