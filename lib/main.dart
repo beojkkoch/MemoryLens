@@ -16,6 +16,7 @@ import 'package:memorylens/features/analyzing/ui/screens/analyzing_screen.dart';
 import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_bloc.dart';
 import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_event.dart';
 import 'package:memorylens/features/login/ui/bloc/login_bloc.dart';
+import 'package:memorylens/features/photo_analysis/ui/bloc/photo_analysis_bloc.dart';
 import 'package:memorylens/features/login/ui/screens/login_screen.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
@@ -95,8 +96,14 @@ class App extends StatelessWidget {
             create: (_) => sl<MemoriesBloc>()..add(MemoriesStarted()),
             child: const MemoriesScreen(),
           ),
-          '/analizando': (_) => BlocProvider(
-            create: (_) => sl<GalleryImportBloc>()..add(GalleryImportStarted()),
+          '/analizando': (_) => MultiBlocProvider(
+            providers: [
+              BlocProvider(
+                create: (_) =>
+                    sl<GalleryImportBloc>()..add(GalleryImportStarted()),
+              ),
+              BlocProvider(create: (_) => sl<PhotoAnalysisBloc>()),
+            ],
             child: const AnalyzingScreen(),
           ),
           '/profile': (_) => BlocProvider(

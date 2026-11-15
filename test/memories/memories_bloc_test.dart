@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:memorylens/features/photo_analysis/domain/entities/photo_analysis_outcome.dart';
 import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
 import 'package:memorylens/features/gallery_access/domain/entities/gallery_permission_status.dart';
 import 'package:memorylens/features/gallery_access/domain/repository/gallery_permission_repository.dart';
@@ -113,6 +114,18 @@ void main() {
       await send([MemoriesStarted()]);
 
       expect(bloc.state.access, GalleryAccess.idle);
+    });
+
+    test('an analysis left half done also goes on to Analizando', () async {
+      photos.photoCount = 3;
+      importFakes.scans.pending = false;
+      // Imported, but the AI has not described it yet.
+      importFakes.photos.imported.add('p0');
+      permission.checkResult = GalleryPermissionStatus.granted;
+
+      await send([MemoriesStarted()]);
+
+      expect(bloc.state.access, GalleryAccess.granted);
     });
 
     test('does not move on when nothing is pending', () async {
@@ -233,6 +246,152 @@ void main() {
 
       expect(bloc.state.access, GalleryAccess.idle);
       expect(bloc.state.errorMessage, AppException.genericMessage);
+    });
+  });
+
+  group('new photos of the device (HU-11)', () {
+    /// A person who already imported and analyzed p0 and p1, and has
+    /// [onDevice] photos on the device now.
+    void connectedWith({required int onDevice}) {
+      photos.photoCount = 2;
+      permission.checkResult = GalleryPermissionStatus.granted;
+      importFakes.gallery.photos = devicePhotos(onDevice);
+      importFakes.photos.imported.addAll({'p0', 'p1'});
+      importFakes.analysis.done['p0'] = PhotoAnalysisOutcome.analyzed;
+      importFakes.analysis.done['p1'] = PhotoAnalysisOutcome.analyzed;
+    }
+
+    Future<MemoriesState> until(bool Function(MemoriesState) test) {
+      if (test(bloc.state)) return Future.value(bloc.state);
+      return bloc.stream.firstWhere(test).timeout(const Duration(seconds: 5));
+    }
+
+    test('opening the app imports and analyzes only the new ones '
+        '(CA1, CA2, CA3)', () async {
+      connectedWith(onDevice: 5);
+
+      bloc.add(MemoriesStarted());
+      final working = await until((s) => s.newPhotos > 0);
+      expect(working.newPhotos, 3);
+      final state = await until((s) => s.newPhotosAnalyzed > 0);
+
+      expect(state.newPhotosAnalyzed, 3);
+      expect(state.newPhotos, 0);
+      expect(importFakes.photos.imported, {'p0', 'p1', 'p2', 'p3', 'p4'});
+      // The photos already processed are not sent again.
+      expect(importFakes.analysis.calls.expand((c) => c).toSet(), {
+        'p2',
+        'p3',
+        'p4',
+      });
+      expect(importFakes.photos.uploadCounts.keys.toSet(), {'p2', 'p3', 'p4'});
+      // It stays in Recuerdos: no Analizando in between.
+      expect(state.access, GalleryAccess.idle);
+    });
+
+    test('N counts only the photos really analyzed', () async {
+      connectedWith(onDevice: 4);
+      importFakes.analysis.blocked.add('p3');
+
+      bloc.add(MemoriesStarted());
+      final state = await until((s) => s.newPhotosAnalyzed > 0);
+
+      expect(state.newPhotosAnalyzed, 1);
+    });
+
+    test('without new photos there is no notice (CA4)', () async {
+      connectedWith(onDevice: 2);
+
+      await send([MemoriesStarted()]);
+      await pumpEventQueue();
+
+      expect(importFakes.gallery.listCalls, 1);
+      expect(bloc.state.newPhotos, 0);
+      expect(bloc.state.newPhotosAnalyzed, 0);
+      expect(importFakes.analysis.calls, isEmpty);
+      expect(importFakes.photos.uploadCounts, isEmpty);
+    });
+
+    test(
+      'a permission taken away in the system stops the search (CA5)',
+      () async {
+        connectedWith(onDevice: 5);
+        permission.checkResult = GalleryPermissionStatus.blocked;
+
+        await send([MemoriesStarted()]);
+        await pumpEventQueue();
+
+        expect(importFakes.gallery.listCalls, 0);
+        expect(importFakes.photos.uploadCounts, isEmpty);
+        expect(bloc.state.newPhotosAnalyzed, 0);
+        // Recuerdos does not ask for it again by itself.
+        expect(permission.requestCalls, 0);
+      },
+    );
+
+    test('a person who never connected the gallery is not searched', () async {
+      permission.checkResult = GalleryPermissionStatus.granted;
+      importFakes.gallery.photos = devicePhotos(3);
+
+      await send([MemoriesStarted()]);
+
+      expect(importFakes.gallery.listCalls, 0);
+    });
+
+    test('a lost connection leaves Recuerdos as it was and the next opening '
+        'goes on', () async {
+      connectedWith(onDevice: 4);
+      importFakes.photos.uploadErrors['p3'] = const AppException(
+        'No pudimos conectarnos.',
+        kind: AppErrorKind.network,
+      );
+
+      bloc.add(MemoriesStarted());
+      await until((s) => s.newPhotos > 0);
+      final state = await until((s) => s.newPhotos == 0);
+      expect(state.newPhotosAnalyzed, 0);
+      expect(state.errorMessage, isNull);
+      expect(state.status, MemoriesStatus.ready);
+
+      importFakes.photos.uploadErrors.clear();
+      bloc.add(MemoriesResumed());
+      final next = await until((s) => s.newPhotosAnalyzed > 0);
+      expect(next.newPhotosAnalyzed, 2);
+    });
+
+    test('coming back to the app looks for new photos again', () async {
+      connectedWith(onDevice: 2);
+      await send([MemoriesStarted()]);
+      await pumpEventQueue();
+      expect(bloc.state.newPhotosAnalyzed, 0);
+
+      importFakes.gallery.photos = devicePhotos(3);
+      bloc.add(MemoriesResumed());
+      final state = await until((s) => s.newPhotosAnalyzed > 0);
+
+      expect(state.newPhotosAnalyzed, 1);
+    });
+
+    test('two openings in a row do not import the same photos twice', () async {
+      connectedWith(onDevice: 4);
+
+      bloc
+        ..add(MemoriesStarted())
+        ..add(MemoriesResumed());
+      await until((s) => s.newPhotosAnalyzed > 0);
+      await pumpEventQueue();
+
+      expect(importFakes.photos.uploadCounts, {'p2': 1, 'p3': 1});
+    });
+
+    test('the notice can be closed', () async {
+      connectedWith(onDevice: 3);
+      bloc.add(MemoriesStarted());
+      await until((s) => s.newPhotosAnalyzed > 0);
+
+      await send([NewPhotosNoticeDismissed()]);
+
+      expect(bloc.state.newPhotosAnalyzed, 0);
     });
   });
 

@@ -29,11 +29,21 @@ class MemoriesState {
   final GalleryAccess access;
   final String? errorMessage;
 
+  /// New photos of the device being imported and analyzed right now
+  /// (HU-11). 0 when nothing is running.
+  final int newPhotos;
+
+  /// New photos analyzed, for «N nuevas fotos analizadas» (HU-11, CA3). 0
+  /// hides the notice.
+  final int newPhotosAnalyzed;
+
   const MemoriesState({
     this.status = MemoriesStatus.loading,
     this.photoCount = 0,
     this.access = GalleryAccess.idle,
     this.errorMessage,
+    this.newPhotos = 0,
+    this.newPhotosAnalyzed = 0,
   });
 
   bool get hasPhotos => photoCount > 0;
@@ -44,18 +54,23 @@ class MemoriesState {
     int? photoCount,
     GalleryAccess? access,
     String? errorMessage,
+    int? newPhotos,
+    int? newPhotosAnalyzed,
   }) {
     return MemoriesState(
       status: status ?? this.status,
       photoCount: photoCount ?? this.photoCount,
       access: access ?? this.access,
       errorMessage: errorMessage,
+      newPhotos: newPhotos ?? this.newPhotos,
+      newPhotosAnalyzed: newPhotosAnalyzed ?? this.newPhotosAnalyzed,
     );
   }
 
   @override
   String toString() {
     return 'MemoriesState(status: ${status.name}, photos: $photoCount, '
-        'access: ${access.name}, error: $errorMessage)';
+        'access: ${access.name}, error: $errorMessage, '
+        'newPhotos: $newPhotos, newPhotosAnalyzed: $newPhotosAnalyzed)';
   }
 }

@@ -7,11 +7,20 @@ import 'package:memorylens/features/gallery_import/domain/entities/device_galler
 import 'package:memorylens/features/gallery_import/domain/repository/device_gallery_repository.dart';
 import 'package:memorylens/features/gallery_import/domain/repository/import_scan_repository.dart';
 import 'package:memorylens/features/gallery_import/domain/repository/photo_import_repository.dart';
+import 'package:memorylens/features/gallery_import/domain/usecases/count_new_photos_usecase.dart';
 import 'package:memorylens/features/gallery_import/domain/usecases/has_pending_import_usecase.dart';
+import 'package:memorylens/features/gallery_import/domain/usecases/import_new_photos_usecase.dart';
 import 'package:memorylens/features/gallery_import/domain/usecases/import_gallery_photos_usecase.dart';
 import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_bloc.dart';
 import 'package:memorylens/features/gallery_import/ui/bloc/gallery_import_event.dart';
+import 'package:memorylens/features/photo_analysis/domain/repository/photo_analysis_repository.dart';
+import 'package:memorylens/features/photo_analysis/domain/usecases/analyze_pending_photos_usecase.dart';
+import 'package:memorylens/features/photo_analysis/domain/usecases/has_pending_analysis_usecase.dart';
+import 'package:memorylens/features/photo_analysis/domain/usecases/retry_failed_photos_usecase.dart';
+import 'package:memorylens/features/photo_analysis/ui/bloc/photo_analysis_bloc.dart';
 import 'package:memorylens/injection_container.dart';
+
+import '../photo_analysis/fake_photo_analysis_repository.dart';
 
 import 'fake_device_gallery_repository.dart';
 import 'fake_import_scan_repository.dart';
@@ -24,7 +33,11 @@ class GalleryImportFakes {
     : gallery = FakeDeviceGalleryRepository(),
       photos = FakePhotoImportRepository(log: log),
       scans = FakeImportScanRepository(log: log),
-      network = FakeNetworkRepository();
+      network = FakeNetworkRepository() {
+    // The analysis sees as pending every photo the import registered. The
+    // device id stands for the id of the row in foto.
+    analysis = FakePhotoAnalysisRepository(importedIds: () => photos.imported);
+  }
 
   /// What the storage and the scan did, in order.
   final List<String> log;
@@ -32,9 +45,14 @@ class GalleryImportFakes {
   final FakePhotoImportRepository photos;
   final FakeImportScanRepository scans;
   final FakeNetworkRepository network;
+  late final FakePhotoAnalysisRepository analysis;
+
+  /// Every pause of the analysis (asked by the AI or before a retry), in order.
+  final List<Duration> waits = [];
 }
 
-/// Registers the fakes and the real use cases of the import. Call it after
+/// Registers the fakes and the real use cases of the import and the analysis
+/// that follows it. Call it after
 /// `sl.reset()`, once per test.
 GalleryImportFakes registerGalleryImportFakes() {
   final fakes = GalleryImportFakes._([]);
@@ -45,16 +63,33 @@ GalleryImportFakes registerGalleryImportFakes() {
   sl.registerLazySingleton(() => ImportGalleryPhotosUseCase());
   sl.registerLazySingleton(() => HasPendingImportUseCase());
   sl.registerLazySingleton(() => WatchConnectivityUseCase());
+  sl.registerSingleton<PhotoAnalysisRepository>(fakes.analysis);
+  sl.registerLazySingleton(
+    () => AnalyzePendingPhotosUseCase(
+      wait: (delay) async => fakes.waits.add(delay),
+    ),
+  );
+  sl.registerLazySingleton(() => HasPendingAnalysisUseCase());
+  sl.registerLazySingleton(() => RetryFailedPhotosUseCase());
+  // HU-11. They also need a GalleryPermissionRepository, which each test
+  // registers.
+  sl.registerLazySingleton(() => CountNewPhotosUseCase());
+  sl.registerLazySingleton(() => ImportNewPhotosUseCase());
   return fakes;
 }
 
-/// The Analizando screen with its bloc, as the app provides it. It starts the
+/// The Analizando screen with its blocs, as the app provides it. It starts the
 /// import at once and does not pause before retrying.
 Widget analyzingRoute() {
-  return BlocProvider(
-    create: (_) =>
-        GalleryImportBloc(retryDelay: Duration.zero)
-          ..add(GalleryImportStarted()),
+  return MultiBlocProvider(
+    providers: [
+      BlocProvider(
+        create: (_) =>
+            GalleryImportBloc(retryDelay: Duration.zero)
+              ..add(GalleryImportStarted()),
+      ),
+      BlocProvider(create: (_) => PhotoAnalysisBloc(retryDelay: Duration.zero)),
+    ],
     child: const AnalyzingScreen(),
   );
 }

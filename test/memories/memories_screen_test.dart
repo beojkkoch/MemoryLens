@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:memorylens/features/photo_analysis/domain/entities/photo_analysis_outcome.dart';
 import 'package:memorylens/features/analyzing/ui/screens/analyzing_screen.dart';
 import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
 import 'package:memorylens/features/gallery_access/domain/entities/gallery_permission_status.dart';
@@ -196,6 +197,52 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(dialogTitle), findsOneWidget);
+    });
+  });
+
+  group('new photos (HU-11)', () {
+    void connectedWith({required int onDevice}) {
+      photos.photoCount = 2;
+      permission.checkResult = GalleryPermissionStatus.granted;
+      importFakes.gallery.photos = devicePhotos(onDevice);
+      importFakes.photos.imported.addAll({'p0', 'p1'});
+      importFakes.analysis.done['p0'] = PhotoAnalysisOutcome.analyzed;
+      importFakes.analysis.done['p1'] = PhotoAnalysisOutcome.analyzed;
+    }
+
+    testWidgets('shows «N nuevas fotos analizadas. Revisar etiquetas»', (
+      tester,
+    ) async {
+      connectedWith(onDevice: 5);
+
+      await pumpMemories(tester);
+      await settle(tester);
+
+      expect(find.text('3 nuevas fotos analizadas.'), findsOneWidget);
+      expect(find.text('Revisar etiquetas'), findsOneWidget);
+      expect(find.byType(AnalyzingScreen), findsNothing);
+    });
+
+    testWidgets('the notice can be closed', (tester) async {
+      connectedWith(onDevice: 3);
+      await pumpMemories(tester);
+      await settle(tester);
+      expect(find.text('1 nueva foto analizada.'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Cerrar aviso'));
+      await settle(tester);
+
+      expect(find.text('1 nueva foto analizada.'), findsNothing);
+    });
+
+    testWidgets('without new photos there is no notice', (tester) async {
+      connectedWith(onDevice: 2);
+
+      await pumpMemories(tester);
+      await settle(tester);
+
+      expect(find.textContaining('analizada'), findsNothing);
+      expect(find.text('Revisar etiquetas'), findsNothing);
     });
   });
 

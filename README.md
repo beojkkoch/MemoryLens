@@ -74,6 +74,7 @@ Es la pantalla principal. Arriba a la derecha el icono de persona abre **Mi perf
 - **Si el sistema dice que no:** aparece *«Sin acceso a tus fotos no hay recuerdos para analizar»* y el botón sigue disponible para intentarlo otra vez. Si el sistema ya no vuelve a preguntar (permiso bloqueado) el mensaje trae **Abrir ajustes**; al volver de los ajustes con el permiso activado la app sigue a **Analizando**.
 
 - **Importación a medias:** si la app se cierra mientras importa, al abrir Recuerdos con el permiso aún activo vuelve sola a **Analizando** y continúa. No vuelve a preguntar nada.
+- **Fotos nuevas (HU-11):** con la galería ya conectada, cada vez que se abre Recuerdos o la app vuelve al frente se comparan las fotos del dispositivo con las ya importadas (`CountNewPhotosUseCase`). Si hay nuevas, se importan y analizan ahí mismo, sin pasar por **Analizando**, con los mismos pasos de HU-07 y HU-08 (`ImportNewPhotosUseCase`): no se resube ni se reanaliza nada ya procesado. Mientras tanto se ve *«Analizando N fotos nuevas…»*, y al terminar el aviso *«N nuevas fotos analizadas.»* con **Revisar etiquetas** (por ahora solo cierra el aviso, hasta que exista la revisión de etiquetas). N cuenta solo las fotos que la IA sí describió. Sin fotos nuevas no aparece nada, y si la persona retiró el permiso en el sistema la galería ni se lee. Si se corta la conexión, lo hecho queda guardado y la siguiente apertura sigue.
 
 La app solo pide fotos con `permission_handler`, aislado en `GalleryPermissionDataSource`: en Android 13 o superior usa `READ_MEDIA_IMAGES`, en Android 12 o inferior el permiso de almacenamiento y en iOS `NSPhotoLibraryUsageDescription`. En iOS, si la persona elige solo algunas fotos (acceso limitado) cuenta como permiso concedido. En web y escritorio no hay permiso de fotos y se muestra un aviso.
 
@@ -86,9 +87,20 @@ Importa las fotos de la galería a tu espacio en Memory Lens (HU-07):
 - **No resube** las que ya están: la fila en `foto` (con su `asset_id`) marca la foto como importada, y cada corrida solo toma las que faltan.
 - **Sin conexión:** muestra *«Esperando conexión»* y sigue sola donde quedó cuando vuelve la red. Si tras varios intentos seguidos no entra ninguna foto (por ejemplo, wifi sin internet) muestra el error con **Reintentar**.
 - **Fotos que no se pueden leer** (borradas durante la importación, o en la nube sin descargar) se omiten y no detienen al resto.
-- **Al terminar** dice *«Listo»* y ofrece **Ver recuerdos**. La barra de progreso con los números llega con su propia historia.
+- **Después la IA describe cada foto** (HU-08), con el título *«Analizando tu galería…»*. Gemini escribe en español un **título**, una **categoría** del catálogo (Factura, Comida, Lugar, Viaje, Mascotas, Personas, Arte, Trabajo), entre 3 y 8 **etiquetas** y una descripción corta (`foto.texto_alt`). Las etiquetas entran a `foto_etiqueta` con `confirmada = false`.
+- **Facturas (HU-09):** si la foto queda en **Factura**, la misma llamada lee el **tipo de compra** (por ejemplo *Cafetería*), el **monto total** y su **moneda** (código ISO, como `COP` o `USD`), y los guarda en `foto.tipo_compra`, `foto.monto` y `foto.moneda`. Si el símbolo es solo «$», la IA usa la ciudad del perfil para saber de qué país es. Lo que no se lee con claridad queda vacío: monto y moneda van juntos o no van, y una foto que no es factura nunca los tiene (la función SQL lo hace cumplir). El tipo de compra también entra como etiqueta y en el texto de la búsqueda. Para mostrarlos, `InvoiceDetails.label()` arma el chip *«Factura · Cafetería · $23.10»* y `Money.format()` da el monto con el formato de su moneda (`$23.10`, `$23.100`, `€1.234,50`).
+- **Embeddings para la búsqueda (HU-21):** cada foto guarda dos vectores de 768 dimensiones de `gemini-embedding-2`, uno de la imagen (`embedding_imagen`) y otro de su texto (`embedding_texto`). Los dos están en el mismo espacio, así que una consulta en texto se compara con ambos.
+- **No se paga dos veces:** `foto.estado_analisis` (`pendiente`, `listo`, `error`) marca lo que ya se hizo. Cada corrida solo envía las pendientes, 4 por llamada y 2 llamadas a la vez (128 fotos son 32 llamadas, unos 3 a 4 minutos).
+- **Límite del plan gratuito:** si Gemini pide esperar, la app espera lo que indica y repite la llamada, hasta 4 veces. Si sigue ocupado, muestra el error con **Reintentar**. Sin conexión hace lo mismo que la importación: *«Esperando conexión»* y sigue sola.
+- **Reintentos (HU-10):** si la IA no logra describir una foto, o una llamada falla por un error del servidor, la foto se reintenta sola hasta **3 veces**. La cuenta vive en `foto.intentos_analisis`, así que se respeta aunque la app se cierre. Una foto que sigue fallando queda en `error` (*«No analizada»*) y no frena al resto. Una foto que ya no está en el bucket pasa a `error` de una vez. Perder la conexión o un Gemini que sigue ocupado no gasta intentos: el análisis espera.
+- **Reintentar las no analizadas (HU-10):** si al terminar quedan fotos *«No analizadas»*, la pantalla no salta sola a Recuerdos: ofrece **Reintentar**, que las devuelve a la cola con sus 3 intentos (`reintentar_fotos_no_analizadas`) y analiza solo esas, o **Ver mis recuerdos**. Si todas salen bien, abre Recuerdos como siempre.
+- **Progreso real (HU-10):** un anillo con el porcentaje, *«Analizadas X de N fotos»* y, si las hay, *«N fotos no analizadas»*. El porcentaje cuenta las fotos procesadas, analizadas o no, y solo llega a 100 % cuando no queda ninguna en cola. Los números cambian cada vez que termina una llamada a la IA, no con una animación, y además cada 4 s se vuelven a leer los conteos guardados en la cuenta, así la pantalla nunca pasa más de 5 s sin novedades aunque una llamada tarde. Mientras importa, el mismo anillo muestra *«Preparadas X de N fotos»*.
+- **A medias:** si la app se cierra durante el análisis, Recuerdos vuelve sola a **Analizando**, igual que con una importación pendiente, y el anillo arranca desde lo que ya está guardado.
+- **Al llegar al 100 %** la pantalla muestra *«¡Listo!»* un momento y abre **Recuerdos** sola.
 
-Las fotos originales del teléfono solo se leen: nada del feature puede modificarlas ni borrarlas, y un test lo vigila. El análisis de las fotos llega con otra historia.
+Las fotos originales del teléfono solo se leen: nada del feature puede modificarlas ni borrarlas, y un test lo vigila.
+
+La clave de la IA nunca está en la app. La Edge Function `analizar-fotos` (`supabase/functions/analizar-fotos`) recibe hasta 4 ids, baja las fotos del bucket con el token de la persona (la RLS aplica), llama a Gemini y guarda todo con la función SQL `guardar_analisis_foto`. Plan gratuito de Google AI Studio: Google puede usar lo que se envía para mejorar sus productos.
 
 ### 7. Mi perfil
 
@@ -113,6 +125,16 @@ npx supabase db push
 ```
 
 La importación de fotos necesita la migración `20261114120000_import_gallery_photos.sql` (bucket `fotos`, políticas de Storage y columnas nuevas): corre `npx supabase db push` antes de probar **Analizando**.
+
+El análisis con IA necesita cuatro migraciones: `20261115120000_analyze_photos.sql` (pgvector, `estado_analisis`, embeddings y las funciones `guardar_analisis_foto` y `marcar_error_analisis_foto`), `20261115130000_invoice_details.sql` (moneda de las facturas; también devuelve a la cola, una sola vez, las facturas ya analizadas para leerles el monto) `20261115140000_analysis_retries.sql` (intentos por foto y `registrar_fallo_analisis_foto`) y `20261115150000_retry_failed_photos.sql` (`reintentar_fotos_no_analizadas`, para el botón **Reintentar**). Además necesita la Edge Function con su clave de Gemini. La clave se saca gratis en [Google AI Studio](https://aistudio.google.com/apikey):
+
+```bash
+npx supabase db push
+npx supabase secrets set GEMINI_API_KEY=<tu-clave>
+npx supabase functions deploy analizar-fotos
+```
+
+El modelo por defecto es `gemini-3.8-flash`. Para cambiarlo sin tocar código: `npx supabase secrets set GEMINI_MODEL=<modelo>`. Los límites del plan gratuito se ven en AI Studio. Las pruebas de la función corren con `npx deno test --allow-env supabase/functions/analizar-fotos`.
 
 El registro necesita que **Confirm email** esté encendido (Dashboard › Authentication › Sign In / Providers › Email), igual que `enable_confirmations = true` en `supabase/config.toml`. Los datos del formulario viajan como metadatos de la cuenta, y el trigger `crear_perfil_al_confirmar` guarda el perfil y los intereses cuando se confirma el correo.
 
