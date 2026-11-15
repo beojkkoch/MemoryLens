@@ -43,8 +43,6 @@ class PhotoDetail {
     return category == InvoiceDetails.category;
   }
 
-  bool get showsPurchaseFields => hasPurchaseFields(category);
-
   @override
   String toString() => 'PhotoDetail($id, $title, $category)';
 }

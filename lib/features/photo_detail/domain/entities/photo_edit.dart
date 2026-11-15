@@ -1,13 +1,12 @@
 import 'package:memorylens/features/photo_analysis/domain/entities/money.dart';
 import 'package:memorylens/features/photo_detail/domain/entities/photo_detail.dart';
 
-/// The data of a photo while the person corrects it in the detail, before
-/// pressing «Hecho» (HU-30). It keeps the rule of which fields apply to each
-/// category (HU-29).
+/// The corrections of a photo, as the detail sends them when the person
+/// presses «Hecho» (HU-30).
 ///
-/// Changing the category only hides or shows the purchase fields: their
-/// values are kept, so going back to «Factura» before saving loses nothing.
-/// They are cleared only by [toSave] (CA3).
+/// While editing, the detail only hides the purchase fields of a category
+/// that is not «Factura» and keeps what they hold. They are cleared here,
+/// by [toSave], and only when saving (HU-29, CA3).
 class PhotoEdit {
   /// For an amount typed in a photo that had none. The app is made for
   /// Colombia first.
@@ -19,37 +18,9 @@ class PhotoEdit {
 
   const PhotoEdit({this.category, this.purchaseType, this.total});
 
-  factory PhotoEdit.from(PhotoDetail detail) {
-    return PhotoEdit(
-      category: detail.category,
-      purchaseType: detail.purchaseType,
-      total: detail.total,
-    );
-  }
-
-  bool get showsPurchaseFields => PhotoDetail.hasPurchaseFields(category);
-
-  /// A photo that was not an invoice has no purchase data, so moving it to
-  /// «Factura» shows both fields empty to fill in (CA2).
-  PhotoEdit withCategory(String? category) {
-    return PhotoEdit(
-      category: category,
-      purchaseType: purchaseType,
-      total: total,
-    );
-  }
-
-  PhotoEdit withPurchase({String? purchaseType, Money? total}) {
-    return PhotoEdit(
-      category: category,
-      purchaseType: purchaseType,
-      total: total,
-    );
-  }
-
   /// What gets saved: outside «Factura» the purchase data is dropped (CA3).
   PhotoEdit toSave() {
-    if (showsPurchaseFields) return this;
+    if (PhotoDetail.hasPurchaseFields(category)) return this;
     return PhotoEdit(category: category);
   }
 
