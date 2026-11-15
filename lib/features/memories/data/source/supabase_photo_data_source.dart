@@ -58,6 +58,30 @@ class SupabasePhotoDataSource {
     }
   }
 
+  /// The photos the AI described after [since], newest first, whatever day
+  /// they were taken. With [takenAfter], only the ones taken after it.
+  Future<List<MemoryPhoto>> analyzedSince({
+    required DateTime since,
+    DateTime? takenAfter,
+  }) async {
+    try {
+      var query = _client
+          .from('foto')
+          .select('id, titulo, fecha_captura, url_imagen, ruta_miniatura')
+          .eq('estado_analisis', 'listo')
+          .gt('analizada_en', since.toUtc().toIso8601String());
+      if (takenAfter != null) {
+        query = query.gt('fecha_captura', takenAfter.toUtc().toIso8601String());
+      }
+      final rows = await query
+          .order('fecha_captura', ascending: false, nullsFirst: false)
+          .order('id');
+      return await _withLinks(rows);
+    } catch (e, stack) {
+      Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
+    }
+  }
+
   /// Signs every image and thumbnail of a page in one call. A file that
   /// cannot be signed gets no link, and the screen shows a gray box for it.
   Future<List<MemoryPhoto>> _withLinks(List<Map<String, dynamic>> rows) async {

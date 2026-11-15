@@ -103,11 +103,15 @@ class MemoriesBloc extends Bloc<MemoriesEvent, MemoriesState> {
       if (found == 0 || emit.isDone) return;
       emit(state.copyWith(newPhotos: found, errorMessage: state.errorMessage));
 
+      final startedAt = DateTime.now();
       final analyzed = await _importNewPhotos();
       final count = await _countPhotos();
       // The timeline and its total follow the analysis (HU-12, CA6).
       final analyzedCount = await _countAnalyzed();
-      final timeline = await _getMemories.refresh(state.timeline);
+      final timeline = await _getMemories.refresh(
+        state.timeline,
+        since: startedAt,
+      );
       if (emit.isDone) return;
       emit(
         state.copyWith(

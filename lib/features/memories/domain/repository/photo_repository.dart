@@ -10,4 +10,11 @@ abstract class PhotoRepository {
   /// Up to [limit] of the photos the AI already described, newest first,
   /// leaving out the first [offset] (HU-15).
   Future<List<MemoryPhoto>> analyzed({required int offset, required int limit});
+
+  /// The photos the AI described after [since], whatever day they were
+  /// taken. With [takenAfter], only the ones taken after it.
+  Future<List<MemoryPhoto>> analyzedSince({
+    required DateTime since,
+    DateTime? takenAfter,
+  });
 }

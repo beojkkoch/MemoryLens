@@ -10,6 +10,10 @@ class GetMemoriesUseCase {
   /// Photos of each page (HU-15, CA1).
   static const pageSize = 60;
 
+  /// The time of the analysis is the server's and [refresh] gets the
+  /// phone's, so it looks a bit further back. What repeats is left out.
+  static const clockMargin = Duration(hours: 1);
+
   final PhotoRepository _photos = sl();
 
   /// The newest page (CA1).
@@ -29,13 +33,26 @@ class GetMemoriesUseCase {
     );
   }
 
-  /// The newest page again, after an analysis, keeping what [current] had
-  /// loaded so the grid does not jump back to the top.
-  Future<MemoryTimeline> refresh(MemoryTimeline current) async {
-    final page = await _photos.analyzed(offset: 0, limit: pageSize);
+  /// Adds to [current] the photos analyzed after [since] that belong to the
+  /// part already loaded, each under its own day, even when it was taken
+  /// long ago. Nothing loaded is dropped, so the grid does not jump.
+  ///
+  /// The ones taken before the oldest loaded photo are left for the next
+  /// pages: added now, they would make the next page skip as many photos.
+  Future<MemoryTimeline> refresh(
+    MemoryTimeline current, {
+    required DateTime since,
+  }) async {
+    final oldest = current.groups.isEmpty
+        ? null
+        : current.groups.last.photos.last.takenAt;
+    final recent = await _photos.analyzedSince(
+      since: since.subtract(clockMargin),
+      takenAfter: current.hasMore ? oldest : null,
+    );
     return MemoryTimeline(
-      photos: _merge(page, current.photos),
-      hasMore: current.hasMore || page.length == pageSize,
+      photos: _merge(current.photos, recent),
+      hasMore: current.hasMore,
     );
   }
 
