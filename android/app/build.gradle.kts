@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "icesi.edu.co.memorylens"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android needs to compile against SDK 37 (higher than Flutter's default).
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

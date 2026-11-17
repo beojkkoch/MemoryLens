@@ -14,6 +14,36 @@ flutter run
 
 La `Project URL` y la `publishable key` de Supabase están en `lib/main.dart`.
 
+## Guía rápida para probar la app
+
+### Requisitos
+
+- **Android o iOS** (dispositivo real o emulador) con algunas fotos en la galería. Los flujos de galería, importación y análisis solo funcionan en móvil: en web y escritorio no hay permiso de fotos y la app lo avisa.
+- Para que el análisis muestre datos de factura, conviene tener en la galería al menos **una foto de un recibo o factura** con el total visible, además de fotos de comida, lugares, mascotas, etc.
+- Conexión a internet (Supabase y la IA corren en la nube; el proyecto ya está desplegado, no hay que configurar nada).
+
+### Cuenta de prueba
+
+Ya confirmada y con fotos analizadas, para entrar sin registrarse:
+
+| Correo | Contraseña |
+|---|---|
+| `<jhondoetitor@gmail.com>` | `<Contrasena@123>` |
+
+Para crear una cuenta propia: **Regístrate** → llena los dos pasos (la contraseña debe tener al menos 6 caracteres) → abre el enlace que llega al correo **desde el mismo teléfono** (abre la app con `memorylens://login-callback/`) → **Ir a iniciar sesión**. Sin confirmar el correo el login responde *«Confirma tu correo antes de iniciar sesión»*.
+
+### Recorrido sugerido
+
+1. **Bienvenida** → **Continuar con correo electrónico** → inicia sesión con la cuenta de prueba.
+2. **Recuerdos**: las fotos analizadas agrupadas por día (*«Hoy»*, *«Ayer»*, fechas). Desplázate hacia abajo para cargar más.
+3. Toca una foto → **Detalle**: título, descripción, fecha y categoría escritos por la IA. Abre una **factura** para ver *Tipo de compra* y *Monto total*.
+4. En el detalle cambia la categoría o el monto y toca **Hecho**; al volver a abrir la foto se ve lo corregido.
+5. Toma o descarga una foto nueva en el teléfono y vuelve a la app: aparece *«Analizando N fotos nuevas…»* y luego *«N nuevas fotos analizadas.»*.
+6. Ícono de persona → **Mi perfil** → **Cerrar sesión**.
+7. Con una **cuenta nueva** (sin fotos): **Permitir acceso a la galería** → **Permitir** en la ventana de la app y en la del sistema → **Analizando** muestra el progreso de importación y análisis → al llegar al 100 % abre **Recuerdos**.
+
+Para probar errores: activa el modo avión en cualquier pantalla (aparece *«Sin conexión»*, y Analizando espera y sigue solo al volver la red), o niega el permiso de fotos en el paso 7 (aparece el mensaje y, si queda bloqueado, **Abrir ajustes**).
+
 ## Cómo navegar la app
 
 La app tiene **un solo tipo de usuario**: la persona dueña de la galería. 
@@ -199,9 +229,17 @@ lib/
       domain/            estado del permiso (concedido, negado, bloqueado), contrato y casos de uso para pedirlo, revisarlo y abrir ajustes
       data/              permission_handler y device_info_plus detrás de un data source
     memories/
-      domain/            contrato y caso de uso para contar las fotos de la persona
-      data/              conteo en la tabla `foto` de Supabase
-      ui/                MemoriesBloc, pantalla Recuerdos, ventana propia de permiso y mensajes de acceso negado
+      domain/            línea de tiempo (grupos por día), conteos y caso de uso para cargar las fotos analizadas por páginas
+      data/              fotos analizadas de la tabla `foto` con miniaturas firmadas
+      ui/                MemoriesBloc, pantalla Recuerdos con la cuadrícula, ventana propia de permiso y avisos de acceso negado y fotos nuevas
+    photo_analysis/
+      domain/            progreso, facturas (InvoiceDetails, Money) y casos de uso para analizar, reintentar y saber si hay análisis pendiente
+      data/              llamada a la Edge Function analizar-fotos y a las funciones SQL de reintento
+      ui/                PhotoAnalysisBloc: analiza por lotes, espera la conexión y respeta el límite de la IA
+    photo_detail/
+      domain/            detalle de una foto, corrección (PhotoEdit) y casos de uso para leerla, listar categorías y guardar
+      data/              foto con su análisis, imagen grande firmada y guardar_correccion_foto
+      ui/                PhotoDetailBloc y pantalla de detalle con el panel de análisis editable
     gallery_import/
       domain/            fotos del dispositivo, progreso y escaneo; contratos de repositorio; casos de uso para importar y para saber si hay una importación a medias
       data/              photo_manager (solo lectura) y Supabase (Storage, `foto`, `escaneo_galeria`), cada uno en su propio data source
