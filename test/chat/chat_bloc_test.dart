@@ -400,4 +400,217 @@ void main() {
       expect(bloc.state.pendingSave, isNotNull);
     });
   });
+
+  group('the conversations of the panel (HU-24)', () {
+    ChatMessage answerWithPhoto() {
+      return ChatMessage.answer(
+        'Aquí tienes las coincidencias:',
+        photos: [searchPhoto('p1', 'Uno')],
+      );
+    }
+
+    test('the list is the saved conversations, the latest activity first '
+        '(CA2)', () async {
+      chat.seed('a', 'Primera');
+      chat.seed('b', 'Segunda');
+      chat.seed('c', 'Tercera');
+      final bloc = await open('a');
+
+      bloc.add(ChatConversationsRequested());
+      await pumpEventQueue();
+
+      expect(
+        [for (final c in bloc.state.conversations) c.title],
+        ['Tercera', 'Segunda', 'Primera'],
+      );
+    });
+
+    test('talking in an old one moves it to the top (CA2)', () async {
+      chat.seed('a', 'Primera');
+      chat.seed('b', 'Segunda');
+      final bloc = await open('a');
+
+      bloc.add(ChatQuestionSent('otra pregunta'));
+      await pumpEventQueue();
+      bloc.add(ChatConversationsRequested());
+      await pumpEventQueue();
+
+      expect([for (final c in bloc.state.conversations) c.id], ['a', 'b']);
+    });
+
+    test('a conversation made on another device shows after the refresh '
+        '(HU-25, CA2)', () async {
+      chat.seed('a', 'Primera');
+      final bloc = await open('a');
+      chat.seed('elsewhere', 'Desde el computador');
+
+      bloc.add(ChatConversationsRequested());
+      await pumpEventQueue();
+
+      expect(bloc.state.conversations.first.id, 'elsewhere');
+    });
+
+    test('a refresh that fails keeps the list and says why', () async {
+      chat.seed('a', 'Primera');
+      final bloc = await open('a');
+      chat.error = const AppException('No pudimos conectarnos.');
+
+      bloc.add(ChatConversationsRequested());
+      await pumpEventQueue();
+
+      expect(bloc.state.status, ChatStatus.ready);
+      expect(bloc.state.conversations, hasLength(1));
+      expect(bloc.state.listError, 'No pudimos conectarnos.');
+
+      chat.error = null;
+      bloc.add(ChatConversationsRequested());
+      await pumpEventQueue();
+      expect(bloc.state.listError, isNull);
+    });
+
+    test('opening one brings all its messages and photos (CA3)', () async {
+      chat.seed('old', 'Factura del café', [
+        ChatMessage.question('factura del café'),
+        answerWithPhoto(),
+      ]);
+      chat.seed('new', 'Perros');
+      final bloc = await open('new');
+
+      bloc.add(ChatConversationOpened('old'));
+      await pumpEventQueue();
+
+      expect(bloc.state.status, ChatStatus.ready);
+      expect(bloc.state.conversation.title, 'Factura del café');
+      expect(bloc.state.messages, hasLength(2));
+      expect(bloc.state.messages.last.photos.single.id, 'p1');
+    });
+
+    test('a conversation that fails to open can be tried again', () async {
+      chat.seed('old', 'Factura del café', [ChatMessage.question('hola')]);
+      chat.seed('new', 'Perros');
+      final bloc = await open('new');
+      chat.error = const AppException('No pudimos conectarnos.');
+
+      bloc.add(ChatConversationOpened('old'));
+      await pumpEventQueue();
+
+      expect(bloc.state.status, ChatStatus.failure);
+      expect(bloc.state.conversation.id, 'old');
+      expect(bloc.state.errorMessage, 'No pudimos conectarnos.');
+
+      chat.error = null;
+      bloc.add(ChatStarted(bloc.state.conversation.id));
+      await pumpEventQueue();
+      expect(bloc.state.status, ChatStatus.ready);
+      expect(bloc.state.messages, hasLength(1));
+    });
+
+    test('the open one, or an unknown one, is not opened again', () async {
+      chat.seed('a', 'Primera', [ChatMessage.question('hola')]);
+      final bloc = await open('a');
+      final states = <ChatState>[];
+      final subscription = bloc.stream.listen(states.add);
+      addTearDown(subscription.cancel);
+
+      bloc.add(ChatConversationOpened('a'));
+      bloc.add(ChatConversationOpened('unknown'));
+      await pumpEventQueue();
+
+      expect(states, isEmpty);
+    });
+
+    test('nothing opens while an answer is on its way', () async {
+      search.gate = Completer<void>();
+      chat.seed('a', 'Primera');
+      chat.seed('b', 'Segunda');
+      final bloc = await open('a');
+      bloc.add(ChatQuestionSent('hola'));
+      await pumpEventQueue();
+
+      bloc.add(ChatConversationOpened('b'));
+      await pumpEventQueue();
+
+      expect(bloc.state.conversation.id, 'a');
+      expect(bloc.state.thinking, isTrue);
+    });
+
+    test('deleting one takes it out of the account and the list; the open '
+        'one stays (CA6, CA8)', () async {
+      chat.seed('a', 'Primera', [ChatMessage.question('hola')]);
+      chat.seed('b', 'Segunda', [ChatMessage.question('adiós')]);
+      final bloc = await open('b');
+
+      bloc.add(ChatConversationDeleted('a'));
+      await pumpEventQueue();
+
+      expect(chat.deleted, ['a']);
+      expect(chat.isSaved('a'), isFalse);
+      expect([for (final c in bloc.state.conversations) c.id], ['b']);
+      expect(bloc.state.conversation.id, 'b');
+      expect(bloc.state.messages, hasLength(1));
+    });
+
+    test('deleting the open one opens the latest that is left (CA7)', () async {
+      chat.seed('a', 'Primera', [ChatMessage.question('hola')]);
+      chat.seed('b', 'Segunda', [ChatMessage.question('adiós')]);
+      chat.seed('c', 'Tercera', [ChatMessage.question('buenas')]);
+      final bloc = await open('c');
+
+      bloc.add(ChatConversationDeleted('c'));
+      await pumpEventQueue();
+
+      expect(bloc.state.status, ChatStatus.ready);
+      expect(bloc.state.conversation.id, 'b');
+      expect(bloc.state.messages.single.text, 'adiós');
+      expect([for (final c in bloc.state.conversations) c.id], ['b', 'a']);
+    });
+
+    test('deleting the only one opens an empty conversation (CA7)', () async {
+      chat.seed('a', 'Primera', [ChatMessage.question('hola')]);
+      final bloc = await open('a');
+
+      bloc.add(ChatConversationDeleted('a'));
+      await pumpEventQueue();
+
+      expect(bloc.state.status, ChatStatus.ready);
+      expect(bloc.state.conversation.title, 'Nueva búsqueda');
+      expect(bloc.state.conversation.id, isNot('a'));
+      expect(bloc.state.messages, isEmpty);
+      expect(bloc.state.conversations, isEmpty);
+    });
+
+    test('a delete that fails says why and keeps everything', () async {
+      chat.seed('a', 'Primera');
+      chat.seed('b', 'Segunda');
+      final bloc = await open('b');
+      chat.deleteError = const AppException('No pudimos conectarnos.');
+
+      bloc.add(ChatConversationDeleted('a'));
+      await pumpEventQueue();
+
+      expect(bloc.state.deleteError, 'No pudimos conectarnos.');
+      expect(bloc.state.conversations, hasLength(2));
+      expect(chat.isSaved('a'), isTrue);
+
+      // The error is not carried to the next change.
+      chat.deleteError = null;
+      bloc.add(ChatConversationsRequested());
+      await pumpEventQueue();
+      expect(bloc.state.deleteError, isNull);
+    });
+
+    test('the open conversation is not deleted while an answer is on its '
+        'way', () async {
+      search.gate = Completer<void>();
+      chat.seed('a', 'Primera');
+      final bloc = await open('a');
+      bloc.add(ChatQuestionSent('hola'));
+      await pumpEventQueue();
+
+      bloc.add(ChatConversationDeleted('a'));
+      await pumpEventQueue();
+
+      expect(chat.deleted, isEmpty);
+    });
+  });
 }

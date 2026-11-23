@@ -8,6 +8,7 @@ import 'package:memorylens/features/chat/ui/bloc/chat_bloc.dart';
 import 'package:memorylens/features/chat/ui/bloc/chat_event.dart';
 import 'package:memorylens/features/chat/ui/screens/chat_screen.dart';
 import 'package:memorylens/features/chat/ui/widgets/chat_input_bar.dart';
+import 'package:memorylens/features/chat/ui/widgets/conversations_drawer.dart';
 import 'package:memorylens/features/chat/ui/widgets/message_bubble.dart';
 import 'package:memorylens/features/error_handling/domain/entities/app_exception.dart';
 import 'package:memorylens/features/memories/domain/entities/memory_photo.dart';
@@ -391,6 +392,225 @@ void main() {
         find.widgetWithIcon(IconButton, Icons.add),
       );
       expect(button.onPressed, isNull);
+    });
+  });
+
+  group('the panel of conversations (HU-24)', () {
+    /// A text inside the panel, not the one in the app bar or the messages.
+    Finder inPanel(String text) {
+      return find.descendant(
+        of: find.byType(ConversationsDrawer),
+        matching: find.text(text),
+      );
+    }
+
+    Future<void> openPanel(WidgetTester tester) async {
+      await tester.tap(find.byTooltip('Conversaciones'));
+      await tester.pumpAndSettle();
+    }
+
+    void seedThree() {
+      chat.seed('a', 'Perros', [ChatMessage.question('mis perros')]);
+      chat.seed('b', 'Factura del café', [
+        ChatMessage.question('factura del café'),
+        ChatMessage.answer(
+          'Aquí tienes las coincidencias:',
+          photos: [searchPhoto('p1', 'Factura del café')],
+        ),
+      ]);
+      chat.seed('c', 'Montañas', [ChatMessage.question('montañas')]);
+    }
+
+    testWidgets('the button opens «Búsquedas» with the conversations, the '
+        'latest activity first (CA1, CA2)', (tester) async {
+      seedThree();
+      await openChat(tester);
+
+      expect(find.byType(ConversationsDrawer), findsNothing);
+      await openPanel(tester);
+
+      expect(inPanel('Búsquedas'), findsOneWidget);
+      final newest = tester.getTopLeft(inPanel('Montañas')).dy;
+      final middle = tester.getTopLeft(inPanel('Factura del café')).dy;
+      final oldest = tester.getTopLeft(inPanel('Perros')).dy;
+      expect(newest, lessThan(middle));
+      expect(middle, lessThan(oldest));
+    });
+
+    testWidgets('tapping one opens it with all its messages and photos and '
+        'closes the panel (CA3)', (tester) async {
+      seedThree();
+      await openChat(tester);
+      await openPanel(tester);
+
+      await tester.tap(inPanel('Factura del café'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ConversationsDrawer), findsNothing);
+      expect(find.text('factura del café'), findsOneWidget);
+      expect(find.text('Aquí tienes las coincidencias:'), findsOneWidget);
+      expect(find.bySemanticsLabel('Abrir Factura del café'), findsOneWidget);
+      expect(find.text('montañas'), findsNothing);
+    });
+
+    testWidgets('closes with the «x» or by tapping outside (CA4)', (
+      tester,
+    ) async {
+      seedThree();
+      await openChat(tester);
+
+      await openPanel(tester);
+      await tester.tap(find.byKey(ConversationsDrawer.closeKey));
+      await tester.pumpAndSettle();
+      expect(find.byType(ConversationsDrawer), findsNothing);
+
+      await openPanel(tester);
+      await tester.tapAt(const Offset(20, 450));
+      await tester.pumpAndSettle();
+      expect(find.byType(ConversationsDrawer), findsNothing);
+    });
+
+    testWidgets('a conversation made elsewhere shows when the panel opens '
+        '(HU-25, CA2)', (tester) async {
+      seedThree();
+      await openChat(tester);
+      chat.seed('d', 'Desde el computador');
+
+      await openPanel(tester);
+
+      expect(inPanel('Desde el computador'), findsOneWidget);
+    });
+
+    testWidgets('«Nueva búsqueda» of the panel opens an empty one and closes '
+        'it (HU-23, CA1)', (tester) async {
+      seedThree();
+      await openChat(tester);
+      await openPanel(tester);
+
+      await tester.tap(find.byKey(ConversationsDrawer.newKey));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ConversationsDrawer), findsNothing);
+      expect(find.text('Nueva búsqueda'), findsOneWidget);
+      expect(find.byType(MessageBubble), findsNothing);
+      expect(chat.savedMessages('c'), hasLength(1));
+    });
+
+    testWidgets('the trash reads «Eliminar [título]» and asks first (CA6)', (
+      tester,
+    ) async {
+      seedThree();
+      await openChat(tester);
+      await openPanel(tester);
+
+      expect(find.byTooltip('Eliminar Perros'), findsOneWidget);
+      // A screen reader reads the tooltip of an icon button.
+      final handle = tester.ensureSemantics();
+      expect(
+        tester
+            .getSemantics(find.byTooltip('Eliminar Factura del café'))
+            .tooltip,
+        'Eliminar Factura del café',
+      );
+      handle.dispose();
+
+      await tester.tap(find.byTooltip('Eliminar Perros'));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Eliminar esta búsqueda?'), findsOneWidget);
+      expect(chat.deleted, isEmpty);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(chat.deleted, isEmpty);
+      expect(inPanel('Perros'), findsOneWidget);
+    });
+
+    testWidgets('confirming deletes it from the account and the panel; the '
+        'conversation that was open stays (CA6, CA8)', (tester) async {
+      seedThree();
+      await openChat(tester);
+      await openPanel(tester);
+
+      await tester.tap(find.byTooltip('Eliminar Perros'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+
+      expect(chat.deleted, ['a']);
+      expect(inPanel('Perros'), findsNothing);
+      expect(inPanel('Montañas'), findsOneWidget);
+      // Still on the conversation that was open, with the panel open.
+      expect(find.text('montañas'), findsOneWidget);
+    });
+
+    testWidgets('deleting the open one opens the latest that is left (CA7)', (
+      tester,
+    ) async {
+      seedThree();
+      await openChat(tester);
+      await openPanel(tester);
+
+      await tester.tap(find.byTooltip('Eliminar Montañas'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+
+      expect(chat.deleted, ['c']);
+      expect(find.byType(ConversationsDrawer), findsNothing);
+      expect(find.text('factura del café'), findsOneWidget);
+      expect(find.text('montañas'), findsNothing);
+    });
+
+    testWidgets('deleting the only one opens an empty conversation (CA7)', (
+      tester,
+    ) async {
+      chat.seed('a', 'Perros', [ChatMessage.question('mis perros')]);
+      await openChat(tester);
+      await openPanel(tester);
+
+      await tester.tap(find.byTooltip('Eliminar Perros'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nueva búsqueda'), findsOneWidget);
+      expect(find.byType(MessageBubble), findsNothing);
+      expect(find.byKey(ChatInputBar.fieldKey), findsOneWidget);
+    });
+
+    testWidgets('a delete that fails says so and the conversation stays', (
+      tester,
+    ) async {
+      seedThree();
+      chat.deleteError = const AppException('No pudimos conectarnos.');
+      await openChat(tester);
+      await openPanel(tester);
+
+      await tester.tap(find.byTooltip('Eliminar Perros'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No pudimos conectarnos.'), findsOneWidget);
+      expect(inPanel('Perros'), findsOneWidget);
+    });
+
+    testWidgets('with no saved conversation the panel says so', (tester) async {
+      await openChat(tester);
+      await openPanel(tester);
+
+      expect(inPanel('Aún no tienes búsquedas guardadas'), findsOneWidget);
+    });
+
+    testWidgets('a conversation opens again from its address (CA5)', (
+      tester,
+    ) async {
+      seedThree();
+
+      await openChat(tester, id: 'a');
+
+      expect(find.text('mis perros'), findsOneWidget);
+      expect(find.text('montañas'), findsNothing);
     });
   });
 }
