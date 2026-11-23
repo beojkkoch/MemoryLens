@@ -36,3 +36,11 @@ class ChatSaveRetried extends ChatEvent {
     return 'ChatSaveRetried()';
   }
 }
+
+/// The person pressed «+» or «Nueva búsqueda» (HU-23, CA1).
+class ChatNewConversationRequested extends ChatEvent {
+  @override
+  String toString() {
+    return 'ChatNewConversationRequested()';
+  }
+}

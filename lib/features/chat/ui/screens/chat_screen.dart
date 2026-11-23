@@ -71,6 +71,17 @@ class _ChatScreenState extends State<ChatScreen> {
           appBar: MemoryLensAppBar(
             title: state.conversation.title,
             onBack: () => Navigator.pop(context),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.add),
+                tooltip: 'Nueva conversación',
+                onPressed: state.canSwitchConversation
+                    ? () => context.read<ChatBloc>().add(
+                        ChatNewConversationRequested(),
+                      )
+                    : null,
+              ),
+            ],
           ),
           body: _body(context, state),
         );

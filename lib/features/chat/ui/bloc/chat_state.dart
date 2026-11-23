@@ -51,6 +51,12 @@ class ChatState {
     this.errorMessage,
   });
 
+  /// The conversation can change only when no answer is on its way and no
+  /// message waits to be saved, so nothing is left behind.
+  bool get canSwitchConversation {
+    return status == ChatStatus.ready && !thinking && pendingSave == null;
+  }
+
   /// The pending message, its error and the search error are carried over
   /// unless given, and given as null they are cleared.
   ChatState copyWith({

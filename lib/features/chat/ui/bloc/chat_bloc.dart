@@ -24,6 +24,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatStarted>(_onStarted);
     on<ChatQuestionSent>(_onQuestionSent);
     on<ChatSaveRetried>(_onSaveRetried);
+    on<ChatNewConversationRequested>(_onNewConversation);
   }
 
   Future<void> _onStarted(ChatStarted event, Emitter<ChatState> emit) async {
@@ -99,6 +100,23 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     if (!await _persist(pending, emit)) return;
     // The question was not answered yet if it could not even be saved.
     if (pending.isUser) await _answer(pending.text, emit);
+  }
+
+  /// Opens an empty conversation. The one that was open is not touched
+  /// (HU-23, CA3), and the new one is not in the history until its first
+  /// message (CA4).
+  void _onNewConversation(
+    ChatNewConversationRequested event,
+    Emitter<ChatState> emit,
+  ) {
+    if (!state.canSwitchConversation) return;
+    emit(
+      state.copyWith(
+        conversation: _startConversation(),
+        messages: const [],
+        answerError: null,
+      ),
+    );
   }
 
   /// Asks the assistant and shows its answer; the answer is saved after it
