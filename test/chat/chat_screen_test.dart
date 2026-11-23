@@ -348,4 +348,49 @@ void main() {
       expect(find.byKey(ChatInputBar.fieldKey), findsOneWidget);
     });
   });
+
+  group('a new conversation (HU-23)', () {
+    testWidgets('«+» (Nueva conversación) opens an empty one titled «Nueva '
+        'búsqueda» (CA1, CA2)', (tester) async {
+      chat.seed(savedId, 'Factura del café', [
+        ChatMessage.question('factura del café'),
+        ChatMessage.answer('Aquí tienes las coincidencias:'),
+      ]);
+      await openChat(tester, id: savedId);
+      expect(find.text('Factura del café'), findsOneWidget);
+      expect(find.byType(MessageBubble), findsNWidgets(2));
+
+      await tester.tap(find.byTooltip('Nueva conversación'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nueva búsqueda'), findsOneWidget);
+      expect(find.text('Factura del café'), findsNothing);
+      expect(find.byType(MessageBubble), findsNothing);
+      expect(chat.savedMessages(savedId), hasLength(2));
+    });
+
+    testWidgets('the cursor is in the field of the new conversation', (
+      tester,
+    ) async {
+      await openChat(tester);
+      await ask(tester, 'hola');
+
+      await tester.tap(find.byTooltip('Nueva conversación'));
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<TextField>(find.byKey(ChatInputBar.fieldKey));
+      expect(field.focusNode!.hasFocus, isTrue);
+    });
+
+    testWidgets('«+» waits while the assistant answers', (tester) async {
+      search.gate = Completer<void>();
+      await openChat(tester);
+      await ask(tester, 'factura');
+
+      final button = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.add),
+      );
+      expect(button.onPressed, isNull);
+    });
+  });
 }

@@ -300,4 +300,104 @@ void main() {
       expect(bloc.state.messages, hasLength(1));
     });
   });
+
+  group('a new conversation (HU-23)', () {
+    test('opens an empty one titled «Nueva búsqueda» with an address of its '
+        'own (CA2)', () async {
+      chat.seed(savedId, 'Factura del café', [ChatMessage.question('hola')]);
+      final bloc = await open(savedId);
+
+      bloc.add(ChatNewConversationRequested());
+      await pumpEventQueue();
+
+      expect(bloc.state.conversation.title, 'Nueva búsqueda');
+      expect(bloc.state.conversation.id, isNotEmpty);
+      expect(bloc.state.conversation.id, isNot(savedId));
+      expect(bloc.state.messages, isEmpty);
+    });
+
+    test('every one gets a different address', () async {
+      final bloc = await open();
+      final first = bloc.state.conversation.id;
+
+      bloc.add(ChatNewConversationRequested());
+      await pumpEventQueue();
+      final second = bloc.state.conversation.id;
+      bloc.add(ChatNewConversationRequested());
+      await pumpEventQueue();
+
+      expect({first, second, bloc.state.conversation.id}, hasLength(3));
+    });
+
+    test('the conversation before is not touched (CA3)', () async {
+      chat.seed(savedId, 'Factura del café', [ChatMessage.question('hola')]);
+      final bloc = await open(savedId);
+
+      bloc.add(ChatNewConversationRequested());
+      await pumpEventQueue();
+
+      expect(chat.saves, isEmpty);
+      expect(chat.deleted, isEmpty);
+      expect(chat.savedMessages(savedId), hasLength(1));
+      expect(bloc.state.conversations.single.title, 'Factura del café');
+    });
+
+    test('without a message it never reaches the history (CA4)', () async {
+      chat.seed(savedId, 'Factura del café');
+      final bloc = await open(savedId);
+
+      bloc.add(ChatNewConversationRequested());
+      await pumpEventQueue();
+      final empty = bloc.state.conversation.id;
+      bloc.add(ChatNewConversationRequested());
+      await pumpEventQueue();
+
+      expect(chat.isSaved(empty), isFalse);
+      expect([for (final c in bloc.state.conversations) c.id], [savedId]);
+      expect((await chat.conversations()).map((c) => c.id), [savedId]);
+    });
+
+    test('its first message creates it and names it', () async {
+      chat.seed(savedId, 'Factura del café', [ChatMessage.question('hola')]);
+      final bloc = await open(savedId);
+      bloc.add(ChatNewConversationRequested());
+      await pumpEventQueue();
+      final created = bloc.state.conversation.id;
+
+      bloc.add(ChatQuestionSent('mis perros'));
+      await pumpEventQueue();
+
+      expect(chat.isSaved(created), isTrue);
+      expect(bloc.state.conversation.title, 'mis perros');
+      expect(
+        [for (final c in bloc.state.conversations) c.id],
+        [created, savedId],
+      );
+      // The old one still has only its own message.
+      expect(chat.savedMessages(savedId), hasLength(1));
+    });
+
+    test('is not opened while an answer is on its way or a message waits '
+        'to be saved', () async {
+      search.gate = Completer<void>();
+      final bloc = await open(savedId);
+      bloc.add(ChatQuestionSent('primera'));
+      await pumpEventQueue();
+
+      bloc.add(ChatNewConversationRequested());
+      await pumpEventQueue();
+      expect(bloc.state.conversation.id, savedId);
+      expect(bloc.state.messages, hasLength(1));
+
+      search.gate!.complete();
+      chat.answerSaveError = const AppException('No pudimos conectarnos.');
+      await pumpEventQueue();
+      expect(bloc.state.pendingSave, isNotNull);
+
+      bloc.add(ChatNewConversationRequested());
+      await pumpEventQueue();
+      expect(bloc.state.conversation.id, savedId);
+      expect(bloc.state.pendingSave, isNotNull);
+    });
+  });
 }
