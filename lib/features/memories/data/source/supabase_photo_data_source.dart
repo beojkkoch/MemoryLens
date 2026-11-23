@@ -82,6 +82,25 @@ class SupabasePhotoDataSource {
     }
   }
 
+  /// The photos with these ids, in the same order, with signed links to their
+  /// thumbnails. The chat shows the photos of an answer with it (HU-22, HU-25).
+  /// An id that is not the person's, or no longer exists, is left out.
+  Future<List<MemoryPhoto>> byIds(List<String> ids) async {
+    if (ids.isEmpty) return const [];
+    try {
+      final rows = await _client
+          .from('foto')
+          .select('id, titulo, fecha_captura, url_imagen, ruta_miniatura')
+          .inFilter('id', ids);
+      final photos = {
+        for (final photo in await _withLinks(rows)) photo.id: photo,
+      };
+      return [for (final id in ids) ?photos[id]];
+    } catch (e, stack) {
+      Error.throwWithStackTrace(ExceptionMapper.map(e), stack);
+    }
+  }
+
   /// Signs every thumbnail of a page in one call; the large image is signed
   /// only when its detail opens (HU-28). A file that cannot be signed gets no
   /// link, and the screen shows a gray box for it.
