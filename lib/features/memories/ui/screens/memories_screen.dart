@@ -93,6 +93,14 @@ class _MemoriesScreenState extends State<MemoriesScreen>
               ],
             ),
             body: _body(context, state),
+            // Opens the chat on its latest conversation (HU-13, HU-20).
+            floatingActionButton: state.status == MemoriesStatus.ready
+                ? FloatingActionButton.extended(
+                    onPressed: () => Navigator.pushNamed(context, '/chat'),
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Buscar con IA'),
+                  )
+                : null,
             bottomNavigationBar: showConnect
                 ? _ConnectBar(
                     isLoading: state.access == GalleryAccess.requesting,

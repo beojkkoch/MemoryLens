@@ -79,7 +79,8 @@ class MemoriesGrid extends StatelessWidget {
                 ),
               ),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          // Room under the last row for the «Buscar con IA» button.
+          const SliverToBoxAdapter(child: SizedBox(height: 88)),
         ],
       ),
     );
