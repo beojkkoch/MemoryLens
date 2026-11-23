@@ -44,3 +44,35 @@ class ChatNewConversationRequested extends ChatEvent {
     return 'ChatNewConversationRequested()';
   }
 }
+
+/// The panel of conversations opened, so its list is up to date (HU-24).
+class ChatConversationsRequested extends ChatEvent {
+  @override
+  String toString() {
+    return 'ChatConversationsRequested()';
+  }
+}
+
+/// The person tapped a conversation of the panel (HU-24, CA3).
+class ChatConversationOpened extends ChatEvent {
+  final String conversationId;
+
+  ChatConversationOpened(this.conversationId);
+
+  @override
+  String toString() {
+    return 'ChatConversationOpened($conversationId)';
+  }
+}
+
+/// The person confirmed deleting a conversation (HU-24, CA6).
+class ChatConversationDeleted extends ChatEvent {
+  final String conversationId;
+
+  ChatConversationDeleted(this.conversationId);
+
+  @override
+  String toString() {
+    return 'ChatConversationDeleted($conversationId)';
+  }
+}

@@ -36,6 +36,14 @@ class ChatState {
   /// Why the conversation could not be loaded.
   final String? errorMessage;
 
+  /// Why the list of the panel could not be refreshed; the list shown is the
+  /// last one that loaded.
+  final String? listError;
+
+  /// Why a conversation could not be deleted. It is not carried over, so
+  /// every change of the state clears it after it was shown.
+  final String? deleteError;
+
   const ChatState({
     this.status = ChatStatus.loading,
     this.conversation = const Conversation(
@@ -49,6 +57,8 @@ class ChatState {
     this.saveError,
     this.answerError,
     this.errorMessage,
+    this.listError,
+    this.deleteError,
   });
 
   /// The conversation can change only when no answer is on its way and no
@@ -67,6 +77,8 @@ class ChatState {
     Object? pendingSave = _keep,
     Object? saveError = _keep,
     Object? answerError = _keep,
+    Object? listError = _keep,
+    String? deleteError,
   }) {
     return ChatState(
       status: status,
@@ -84,6 +96,10 @@ class ChatState {
           ? this.answerError
           : answerError as String?,
       errorMessage: errorMessage,
+      listError: identical(listError, _keep)
+          ? this.listError
+          : listError as String?,
+      deleteError: deleteError,
     );
   }
 
@@ -92,6 +108,7 @@ class ChatState {
     return 'ChatState(status: ${status.name}, conversation: $conversation, '
         'messages: ${messages.length}, thinking: $thinking, '
         'pendingSave: $pendingSave, saveError: $saveError, '
-        'answerError: $answerError, error: $errorMessage)';
+        'answerError: $answerError, error: $errorMessage, '
+        'listError: $listError, deleteError: $deleteError)';
   }
 }
