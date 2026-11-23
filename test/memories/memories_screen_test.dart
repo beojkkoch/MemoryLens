@@ -85,6 +85,7 @@ void main() {
             child: const MemoriesScreen(),
           ),
           '/analizando': (_) => analyzingRoute(),
+          '/chat': (_) => const Scaffold(body: Text('Chat abierto')),
           '/foto': (context) {
             final id = ModalRoute.of(context)!.settings.arguments as String;
             return BlocProvider(
@@ -373,6 +374,36 @@ void main() {
       expect(find.text(AppException.genericMessage), findsOneWidget);
       expect(find.textContaining('PlatformException'), findsNothing);
       expect(find.text(connectButton), findsOneWidget);
+    });
+  });
+
+  group('search with AI (HU-13, HU-20)', () {
+    testWidgets('the «Buscar con IA» button opens the chat', (tester) async {
+      photos.photoCount = 1;
+      photos.analyzedPhotos = [
+        memoryPhoto('p1', takenAt: DateTime(2024, 6, 15, 9)),
+      ];
+      await pumpMemories(tester);
+
+      expect(find.text('Buscar con IA'), findsOneWidget);
+      await tester.tap(find.text('Buscar con IA'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chat abierto'), findsOneWidget);
+    });
+
+    testWidgets('does not cover the last row of the grid', (tester) async {
+      photos.photoCount = 3;
+      photos.analyzedPhotos = [
+        for (var i = 0; i < 3; i++)
+          memoryPhoto('p$i', takenAt: DateTime(2024, 6, 15, 12 - i)),
+      ];
+      await pumpMemories(tester);
+
+      final button = tester.getRect(find.byType(FloatingActionButton));
+      final lastTile = tester.getRect(find.byType(MemoryTile).last);
+      // Room under the tiles even when everything is on screen.
+      expect(button.top, greaterThanOrEqualTo(lastTile.bottom));
     });
   });
 
