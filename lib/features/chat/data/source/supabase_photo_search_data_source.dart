@@ -12,10 +12,40 @@ class SupabasePhotoSearchDataSource {
 
   /// Words that are in almost every question and say nothing about the photo.
   static const _stopWords = {
-    'donde', 'esta', 'estan', 'que', 'una', 'uno', 'unas', 'unos', 'del',
-    'los', 'las', 'por', 'con', 'para', 'como', 'mis', 'mas', 'muy', 'hay',
-    'foto', 'fotos', 'imagen', 'imagenes', 'tengo', 'tomo', 'saque', 'busca',
-    'buscar', 'muestrame', 'quiero', 'ver', 'cuando', 'cual', 'cuales',
+    'donde',
+    'esta',
+    'estan',
+    'que',
+    'una',
+    'uno',
+    'unas',
+    'unos',
+    'del',
+    'los',
+    'las',
+    'por',
+    'con',
+    'para',
+    'como',
+    'mis',
+    'mas',
+    'muy',
+    'hay',
+    'foto',
+    'fotos',
+    'imagen',
+    'imagenes',
+    'tengo',
+    'tomo',
+    'saque',
+    'busca',
+    'buscar',
+    'muestrame',
+    'quiero',
+    'ver',
+    'cuando',
+    'cual',
+    'cuales',
   };
 
   final SupabaseClient _client = Supabase.instance.client;
@@ -38,9 +68,9 @@ class SupabasePhotoSearchDataSource {
   /// accents or signs, at least 3 letters, no repeats and not the filler of a
   /// question («¿dónde está la factura del café?» gives factura and cafe).
   static List<String> termsFrom(String question) {
-    final words = _plain(question)
-        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-        .split(' ');
+    final words = _plain(
+      question,
+    ).replaceAll(RegExp(r'[^a-z0-9]+'), ' ').split(' ');
     final terms = <String>[];
     for (final word in words) {
       if (word.length < 3 || _stopWords.contains(word)) continue;

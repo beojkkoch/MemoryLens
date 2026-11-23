@@ -20,6 +20,9 @@ import 'package:memorylens/features/photo_analysis/ui/bloc/photo_analysis_bloc.d
 import 'package:memorylens/features/login/ui/screens/login_screen.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_bloc.dart';
 import 'package:memorylens/features/memories/ui/bloc/memories_event.dart';
+import 'package:memorylens/features/chat/ui/bloc/chat_bloc.dart';
+import 'package:memorylens/features/chat/ui/bloc/chat_event.dart';
+import 'package:memorylens/features/chat/ui/screens/chat_screen.dart';
 import 'package:memorylens/features/memories/ui/screens/memories_screen.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_bloc.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_event.dart';
@@ -118,6 +121,16 @@ class App extends StatelessWidget {
               create: (_) =>
                   sl<PhotoDetailBloc>()..add(PhotoDetailRequested(photoId)),
               child: PhotoDetailScreen(photoId: photoId),
+            );
+          },
+          // The conversation to open comes as the argument; without it the
+          // latest one opens (HU-20, HU-24).
+          '/chat': (context) {
+            final conversationId =
+                ModalRoute.of(context)!.settings.arguments as String?;
+            return BlocProvider(
+              create: (_) => sl<ChatBloc>()..add(ChatStarted(conversationId)),
+              child: ChatScreen(conversationId: conversationId),
             );
           },
           '/profile': (_) => BlocProvider(

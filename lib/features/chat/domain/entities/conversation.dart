@@ -20,8 +20,7 @@ class Conversation {
   /// The id comes from the app and the conversation reaches the account with
   /// its first message, so an empty one never shows in the history (HU-23,
   /// CA4).
-  const Conversation.draft(String id)
-    : this(id: id, title: defaultTitle);
+  const Conversation.draft(String id) : this(id: id, title: defaultTitle);
 
   /// The title a conversation gets from its first question: the spaces
   /// collapsed and a long text cut with «…».

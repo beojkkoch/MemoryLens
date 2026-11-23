@@ -43,7 +43,9 @@ class SupabaseChatDataSource {
     try {
       final rows = await _client
           .from('mensaje')
-          .select('id, rol, texto, creado_en, resultado_mensaje(foto_id, posicion)')
+          .select(
+            'id, rol, texto, creado_en, resultado_mensaje(foto_id, posicion)',
+          )
           .eq('conversacion_id', conversationId)
           .order('creado_en')
           .order('id');

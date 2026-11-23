@@ -18,6 +18,7 @@ import 'package:memorylens/features/chat/domain/usecases/get_chat_messages_useca
 import 'package:memorylens/features/chat/domain/usecases/get_conversations_usecase.dart';
 import 'package:memorylens/features/chat/domain/usecases/save_chat_message_usecase.dart';
 import 'package:memorylens/features/chat/domain/usecases/start_conversation_usecase.dart';
+import 'package:memorylens/features/chat/ui/bloc/chat_bloc.dart';
 import 'package:memorylens/features/auth/data/repository/auth_repository_impl.dart';
 import 'package:memorylens/features/auth/data/repository/interest_repository_impl.dart';
 import 'package:memorylens/features/auth/data/repository/profile_repository_impl.dart';
@@ -180,4 +181,5 @@ void initDependencies() {
   sl.registerFactory(() => GalleryImportBloc());
   sl.registerFactory(() => PhotoAnalysisBloc());
   sl.registerFactory(() => PhotoDetailBloc());
+  sl.registerFactory(() => ChatBloc());
 }
