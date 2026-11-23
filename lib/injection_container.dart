@@ -6,6 +6,18 @@ import 'package:memorylens/features/photo_detail/domain/usecases/get_categories_
 import 'package:memorylens/features/photo_detail/domain/usecases/get_photo_detail_usecase.dart';
 import 'package:memorylens/features/photo_detail/domain/usecases/save_photo_edit_usecase.dart';
 import 'package:memorylens/features/photo_detail/ui/bloc/photo_detail_bloc.dart';
+import 'package:memorylens/features/chat/data/repository/chat_repository_impl.dart';
+import 'package:memorylens/features/chat/data/repository/photo_search_repository_impl.dart';
+import 'package:memorylens/features/chat/data/source/supabase_chat_data_source.dart';
+import 'package:memorylens/features/chat/data/source/supabase_photo_search_data_source.dart';
+import 'package:memorylens/features/chat/domain/repository/chat_repository.dart';
+import 'package:memorylens/features/chat/domain/repository/photo_search_repository.dart';
+import 'package:memorylens/features/chat/domain/usecases/answer_question_usecase.dart';
+import 'package:memorylens/features/chat/domain/usecases/delete_conversation_usecase.dart';
+import 'package:memorylens/features/chat/domain/usecases/get_chat_messages_usecase.dart';
+import 'package:memorylens/features/chat/domain/usecases/get_conversations_usecase.dart';
+import 'package:memorylens/features/chat/domain/usecases/save_chat_message_usecase.dart';
+import 'package:memorylens/features/chat/domain/usecases/start_conversation_usecase.dart';
 import 'package:memorylens/features/auth/data/repository/auth_repository_impl.dart';
 import 'package:memorylens/features/auth/data/repository/interest_repository_impl.dart';
 import 'package:memorylens/features/auth/data/repository/profile_repository_impl.dart';
@@ -87,6 +99,8 @@ void initDependencies() {
   sl.registerLazySingleton(() => SupabaseImportScanDataSource());
   sl.registerLazySingleton(() => SupabasePhotoAnalysisDataSource());
   sl.registerLazySingleton(() => SupabasePhotoDetailDataSource());
+  sl.registerLazySingleton(() => SupabaseChatDataSource());
+  sl.registerLazySingleton(() => SupabasePhotoSearchDataSource());
 
   //Repositories
   sl.registerLazySingleton<AuthRepository>(() => AuthRepositoryImpl());
@@ -115,6 +129,10 @@ void initDependencies() {
   sl.registerLazySingleton<PhotoDetailRepository>(
     () => PhotoDetailRepositoryImpl(),
   );
+  sl.registerLazySingleton<ChatRepository>(() => ChatRepositoryImpl());
+  sl.registerLazySingleton<PhotoSearchRepository>(
+    () => PhotoSearchRepositoryImpl(),
+  );
 
   //Use cases
   sl.registerLazySingleton(() => GetInterestsUseCase());
@@ -140,6 +158,12 @@ void initDependencies() {
   sl.registerLazySingleton(() => GetPhotoDetailUseCase());
   sl.registerLazySingleton(() => GetCategoriesUseCase());
   sl.registerLazySingleton(() => SavePhotoEditUseCase());
+  sl.registerLazySingleton(() => GetConversationsUseCase());
+  sl.registerLazySingleton(() => GetChatMessagesUseCase());
+  sl.registerLazySingleton(() => StartConversationUseCase());
+  sl.registerLazySingleton(() => SaveChatMessageUseCase());
+  sl.registerLazySingleton(() => AnswerQuestionUseCase());
+  sl.registerLazySingleton(() => DeleteConversationUseCase());
 
   //Observers
   sl.registerLazySingleton(() => ScreenTracker());
