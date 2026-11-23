@@ -39,10 +39,11 @@ Para crear una cuenta propia: **Regístrate** → llena los dos pasos (la contra
 3. Toca una foto → **Detalle**: título, descripción, fecha y categoría escritos por la IA. Abre una **factura** para ver *Tipo de compra* y *Monto total*.
 4. En el detalle cambia la categoría o el monto y toca **Hecho**; al volver a abrir la foto se ve lo corregido.
 5. Toma o descarga una foto nueva en el teléfono y vuelve a la app: aparece *«Analizando N fotos nuevas…»* y luego *«N nuevas fotos analizadas.»*.
-6. Ícono de persona → **Mi perfil** → **Cerrar sesión**.
-7. Con una **cuenta nueva** (sin fotos): **Permitir acceso a la galería** → **Permitir** en la ventana de la app y en la del sistema → **Analizando** muestra el progreso de importación y análisis → al llegar al 100 % abre **Recuerdos**.
+6. Botón **Buscar con IA** → escribe *«factura del café»* y envía: ves *«Pensando…»* y luego las fotos que coinciden. Abre una con un toque. Prueba **+** (nueva conversación) y el botón de conversaciones (panel *«Búsquedas»*) para abrir o eliminar las anteriores.
+7. Ícono de persona → **Mi perfil** → **Cerrar sesión**.
+8. Con una **cuenta nueva** (sin fotos): **Permitir acceso a la galería** → **Permitir** en la ventana de la app y en la del sistema → **Analizando** muestra el progreso de importación y análisis → al llegar al 100 % abre **Recuerdos**.
 
-Para probar errores: activa el modo avión en cualquier pantalla (aparece *«Sin conexión»*, y Analizando espera y sigue solo al volver la red), o niega el permiso de fotos en el paso 7 (aparece el mensaje y, si queda bloqueado, **Abrir ajustes**).
+Para probar errores: activa el modo avión en cualquier pantalla (aparece *«Sin conexión»*, y Analizando espera y sigue solo al volver la red), o niega el permiso de fotos en el paso 8 (aparece el mensaje y, si queda bloqueado, **Abrir ajustes**).
 
 ## Cómo navegar la app
 
@@ -95,7 +96,7 @@ Escribe correo y contraseña y toca **Entrar**. Si todo va bien se abre **Recuer
 
 ### 5. Recuerdos
 
-Es la pantalla principal. Arriba a la derecha el icono de persona abre **Mi perfil**.
+Es la pantalla principal. Arriba a la derecha el icono de persona abre **Mi perfil**, y el botón flotante **Buscar con IA** abre el [chat de búsqueda](#9-búsqueda-con-ia-chat) en su conversación más reciente (HU-13 solo está hecha a medias: falta el botón de la cámara). La cuadrícula deja espacio debajo de la última fila para que el botón no la tape.
 
 - **Sin fotos todavía:** muestra *«Sin conectar»*, el contador *«0 fotos»*, *«Aún no tienes recuerdos»* y el botón **Permitir acceso a la galería**. Si la persona ya tiene fotos guardadas, esta invitación no aparece.
 - **Línea de tiempo (HU-12):** las fotos ya analizadas se ven en una cuadrícula de 3 columnas con miniaturas cuadradas, agrupadas por el día en que se tomaron (`fecha_captura`, no la fecha de importación): *«Hoy»*, *«Ayer»* y luego fechas como *«15 jun 2024»*, del día más reciente al más antiguo, y dentro de cada día de la más reciente a la más antigua. Las fotos sin fecha van al final en *«Sin fecha»*. Bajo el título *«Recuerdos»* aparece el mes de la foto más reciente (*«Junio 2024»*), y a la derecha el total de fotos analizadas (*«128 fotos»*, *«1 foto»*), que se actualiza cuando termina el análisis de fotos nuevas.
@@ -140,7 +141,7 @@ La clave de la IA nunca está en la app. La Edge Function `analizar-fotos` (`sup
 
 ### 7. Detalle de foto
 
-Se abre desde Recuerdos, y más adelante desde el chat, con el id de la foto (HU-28):
+Se abre desde Recuerdos y desde las respuestas del chat, con el id de la foto (HU-28):
 
 - Arriba, la foto en grande ocupa cerca del 70 % de la pantalla y un degradado la une al panel de abajo. Es la copia grande del bucket (hasta 2560 px), firmada solo al abrir el detalle y con validez de 1 h; nunca la miniatura. La foto se ve completa, sin recortar, para que una factura se pueda leer entera.
 - El panel muestra *«ANÁLISIS DE IA»*, el título con un ícono de etiqueta y la descripción que escribió la IA (`foto.texto_alt`).
@@ -155,6 +156,17 @@ Se abre desde Recuerdos, y más adelante desde el chat, con el id de la foto (HU
 ### 8. Mi perfil
 
 Muestra tu nombre, profesión, ciudad, correo e intereses. **Cerrar sesión** te devuelve a la bienvenida.
+
+### 9. Búsqueda con IA (chat)
+
+Se abre desde **Buscar con IA** en Recuerdos (`/chat`). El argumento de la ruta es el id de la conversación («su propia dirección», HU-24 CA5); sin argumento abre la más reciente, o una vacía si no hay ninguna.
+
+- **Preguntar (HU-20):** el campo dice *«Busca una foto…»* y tiene el cursor al abrir. La pregunta se envía con el botón o con Enter, el campo se limpia y la pregunta aparece a la derecha con el color principal. No se envían textos vacíos o de solo espacios. Mientras la IA responde aparece *«Pensando…»* (animado, anunciado a los lectores de pantalla) y el botón de enviar queda deshabilitado; desaparece cuando llega la respuesta o el error. Lo que se escribe nunca se pierde: el texto vive en el `State` del campo.
+- **La respuesta:** a la izquierda, con el texto *«Aquí tienes las coincidencias:»* y las fotos en una cuadrícula de 3 columnas con las mismas miniaturas que Recuerdos (*«Abrir [título]»*, abren el detalle de la foto). Sin coincidencias dice *«No encontré fotos que coincidan»* y no muestra fotos. Si la búsqueda falla, el error se ve en la conversación y se puede preguntar de nuevo.
+- **La búsqueda es provisional:** el chat solo conoce el puerto `PhotoSearchRepository`. Hoy lo implementa `PhotoSearchRepositoryImpl`, que separa la pregunta en palabras (sin tildes, sin palabras de relleno, hasta 8) y llama a la función SQL `buscar_fotos_por_palabras`: fotos analizadas de la persona cuyo título, descripción, tipo de compra, categoría o etiquetas contienen alguna palabra, primero las que coinciden con más (hasta 12). La búsqueda semántica con embeddings (HU-21) solo debe dar otra implementación del mismo puerto.
+- **Nueva conversación (HU-23):** el botón **+** de la barra superior («Nueva conversación») y **Nueva búsqueda** del panel abren una conversación vacía titulada *«Nueva búsqueda»* con un id propio (un uuid que genera la app). La anterior no se toca. La conversación vacía **no se guarda**: llega a la cuenta con su primer mensaje, así que si la persona no escribe nada no queda en el historial. Mientras una respuesta está en camino, o un mensaje espera guardarse, no se puede cambiar de conversación para no dejar nada atrás.
+- **El historial (HU-24):** el botón de conversaciones abre el panel lateral **Búsquedas** con la lista, de la última actividad a la más antigua. Cada vez que se abre se vuelve a pedir la lista, así aparecen las conversaciones hechas en otro dispositivo. Tocar una la abre con todos sus mensajes y fotos y cierra el panel; se cierra también con la «x» o tocando fuera. La papelera (*«Eliminar [título]»*) pide confirmación; al eliminar la conversación abierta se abre la más reciente que quede, o una vacía si no queda ninguna. Eliminar borra la conversación, sus mensajes y los resultados (`on delete cascade`), nunca las fotos. El título es la primera pregunta (hasta 40 caracteres).
+- **Guardado en la cuenta (HU-25):** cada pregunta y cada respuesta, con sus fotos en orden, se guarda en cuanto existe con la función SQL `guardar_mensaje_chat` (crea la conversación con el primer mensaje, guarda los resultados con su posición y sube `conversacion.actualizada_en`, todo o nada). La RLS hace que cada persona vea y escriba solo en sus conversaciones y solo muestre fotos propias. Si el guardado falla se avisa con **Reintentar**, el mensaje se conserva y no se puede seguir hasta guardarlo para no desordenar la conversación; la pregunta que no se guardó se responde al reintentar. Si el archivo de una foto de una respuesta ya no está, esa foto muestra *«Foto no disponible»* en vez de fallar.
 
 ## Errores y falta de conexión
 
@@ -178,6 +190,8 @@ La importación de fotos necesita la migración `20261114120000_import_gallery_p
 
 Las correcciones del detalle necesitan la migración `20261115160000_save_photo_corrections.sql` (`guardar_correccion_foto`): corre `npx supabase db push`.
 
+El chat de búsqueda necesita la migración `20261123120000_chat_messages.sql` (`guardar_mensaje_chat` y `buscar_fotos_por_palabras`; las tablas ya existen desde `create_chat`): corre `npx supabase db push` antes de probar **Buscar con IA**.
+
 El análisis con IA necesita cuatro migraciones: `20261115120000_analyze_photos.sql` (pgvector, `estado_analisis`, embeddings y las funciones `guardar_analisis_foto` y `marcar_error_analisis_foto`), `20261115130000_invoice_details.sql` (moneda de las facturas; también devuelve a la cola, una sola vez, las facturas ya analizadas para leerles el monto) `20261115140000_analysis_retries.sql` (intentos por foto y `registrar_fallo_analisis_foto`) y `20261115150000_retry_failed_photos.sql` (`reintentar_fotos_no_analizadas`, para el botón **Reintentar**). Además necesita la Edge Function con su clave de Gemini. La clave se saca gratis en [Google AI Studio](https://aistudio.google.com/apikey):
 
 ```bash
@@ -198,7 +212,7 @@ Basado en el modelo entidad-relación del proyecto:
 
 - **Cuenta y acceso:** `usuario`, `interes`, `usuario_interes`, `escaneo_galeria`.
 - **Fotos y etiquetas:** `categoria`, `foto`, `etiqueta`, `foto_etiqueta`.
-- **Búsqueda con IA (chat):** `conversacion`, `mensaje`, `resultado_mensaje`.
+- **Búsqueda con IA (chat):** `conversacion`, `mensaje`, `resultado_mensaje` (las fotos de cada respuesta, con su `posicion`). Se escriben con `guardar_mensaje_chat`; borrar una conversación borra en cascada sus mensajes y resultados, no las fotos.
 - **Errores de la app:** `registro_error` (solo inserción, sin lectura desde la app).
 
 **Fotos importadas.** Cada foto importada es una fila de `foto` con `asset_id` (id de la foto en el dispositivo, único por persona), `url_imagen` (la **ruta** del archivo en el bucket `fotos`, no una URL: la URL firmada se pide al mostrarla), `ruta_miniatura` y `fecha_captura` (nula si el dispositivo no tiene fecha). El bucket `fotos` es privado y cada persona solo ve y escribe en su carpeta `<usuario_id>/`. `escaneo_galeria` guarda el total de fotos a procesar y `importacion_finalizada_en`; solo puede haber un escaneo abierto por persona.
@@ -244,6 +258,10 @@ lib/
       domain/            fotos del dispositivo, progreso y escaneo; contratos de repositorio; casos de uso para importar y para saber si hay una importación a medias
       data/              photo_manager (solo lectura) y Supabase (Storage, `foto`, `escaneo_galeria`), cada uno en su propio data source
       ui/                GalleryImportBloc: importa, espera la conexión y reintenta
+    chat/
+      domain/            conversaciones y mensajes, contratos (`ChatRepository`, y `PhotoSearchRepository` para la búsqueda) y casos de uso para preguntar, guardar, listar, abrir y eliminar
+      data/              conversaciones y mensajes en Supabase (`guardar_mensaje_chat`) y la búsqueda provisional por palabras
+      ui/                ChatBloc, pantalla del chat, burbujas, «Pensando…» y el panel Búsquedas
     analyzing/ui/        pantalla Analizando (importando, esperando conexión, error y «Listo»)
     register/ui/         RegisterBloc y pantalla de registro con caracterización
     welcome/ui/          pantalla inicial con los botones a inicio de sesión y registro
@@ -254,3 +272,5 @@ lib/
 ```
 
 `flutter test` comprueba la navegación de la pantalla inicial, las validaciones del formulario, que el registro guarda el perfil y los intereses, los mensajes de error y de falta de conexión, que los formularios conservan lo escrito tras un fallo, y el registro de errores con su pantalla y acción. También prueba el flujo de la galería: la ventana propia, que sin ella no se pide el permiso del sistema, el permiso negado y el bloqueado con **Abrir ajustes**, y que Recuerdos no muestra la invitación si ya hay fotos. Y prueba la importación: que sube todo con su fecha, que no resube las ya importadas, que guarda el total antes de subir, que continúa tras perder la conexión sin repetir subidas, que omite las fotos ilegibles, que Analizando muestra cada estado y que Recuerdos retoma una importación a medias. Un test revisa que el código del feature nunca llame a lo que escribe o borra en la galería.
+
+Y prueba el chat de búsqueda: que la pregunta se envía con el botón y con Enter y no se envían textos vacíos, que *«Pensando…»* dura hasta la respuesta y bloquea un segundo envío, que cada mensaje se guarda en orden con sus fotos y que si el guardado falla se conserva y se reintenta, que una conversación nueva vacía no llega al historial, y que el panel lista, abre y elimina conversaciones (incluida la abierta).
